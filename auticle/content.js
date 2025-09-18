@@ -18,6 +18,9 @@ const PREFETCH_AHEAD = 2;
 let retryCount = 0;
 const MAX_RETRIES = 2;
 
+// バッチサイズ
+const BATCH_SIZE = 3;
+
 // ----- Readability 注入 & カスタムルール定義 -----
 // ドメインごとの独自抽出ルール（まずは qiita.com のプレースホルダ）
 const customRules = {
@@ -226,6 +229,24 @@ function cleanupPage() {
   removeStyles();
 }
 
+// ハイライトを更新する関数
+function updateHighlight(paragraphId) {
+  // 既存のハイライトを解除
+  const currentHighlight = document.querySelector(".auticle-highlight");
+  if (currentHighlight) {
+    currentHighlight.classList.remove("auticle-highlight");
+  }
+  // 新しいハイライトを設定
+  if (paragraphId !== null) {
+    const element = document.querySelector(
+      `[data-auticle-id="${paragraphId}"]`
+    );
+    if (element) {
+      element.classList.add("auticle-highlight");
+    }
+  }
+}
+
 function handleClick(event) {
   const target = event.target.closest(".auticle-clickable");
   if (!target) return;
@@ -311,7 +332,8 @@ function handleClick(event) {
       queueIndex = 0;
       console.warn("handleClick: No valid ID, starting at 0");
     }
-    playQueue();
+    // 全キューを一括フェッチしてから再生開始
+    fullBatchFetch(() => playQueue());
   } else {
     console.error("handleClick: No queue built");
   }
@@ -489,13 +511,36 @@ function playQueue() {
     );
     audioPlayer.src = cached;
   } else {
-    console.log("playQueue: Requesting audio for index:", queueIndex);
-    // 通常の再生要求
-    chrome.runtime.sendMessage({ command: "play", text: item.text });
+    console.log(
+      "playQueue: No cached audio for index:",
+      queueIndex,
+      "Cache size:",
+      audioCache.size
+    );
+    // 全フェッチ済みのはずなので、エラー扱い
+    retryCount++;
+    if (retryCount < MAX_RETRIES) {
+      console.log("playQueue: Retrying in 3s, attempt:", retryCount);
+      setTimeout(() => playQueue(), 3000);
+    } else {
+      console.log(
+        `playQueue: Max retries reached for index ${queueIndex}, skipping`
+      );
+      retryCount = 0;
+      isPlaying = false;
+      queueIndex += 1;
+      if (queueIndex < playbackQueue.length) {
+        playQueue();
+      } else {
+        updateHighlight(null);
+        playbackQueue = [];
+        queueIndex = 0;
+      }
+    }
   }
 
-  // 次の N 個を非同期でプリフェッチ
-  prefetchNext(queueIndex + 1);
+  // 次の N 個を非同期でプリフェッチ（バッチで）
+  prefetchBatch(queueIndex + 1);
 }
 
 // 指定された startIndex 以降で PREFETCH_AHEAD 個を先読みして audioCache に格納
@@ -522,23 +567,107 @@ function prefetchNext(startIndex) {
   }
 }
 
-// 指定した段落IDをハイライト。null なら解除。
-function updateHighlight(paragraphId) {
-  // 既存ハイライトをすべて削除
-  const prev = document.querySelectorAll(".auticle-highlight");
-  prev.forEach((el) => el.classList.remove("auticle-highlight"));
-
-  if (paragraphId === null || paragraphId === undefined) return;
-
-  const selector = `[data-auticle-id="${paragraphId}"]`;
-  const el = document.querySelector(selector);
-  if (el) {
-    el.classList.add("auticle-highlight");
-    // 可能ならスクロールして見える位置にする
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-  } else {
-    console.warn(`Element with data-auticle-id="${paragraphId}" not found`);
+// バッチでフェッチ
+function fetchBatch(startIndex) {
+  const batch = [];
+  for (
+    let i = startIndex;
+    i < Math.min(playbackQueue.length, startIndex + BATCH_SIZE);
+    i++
+  ) {
+    if (!audioCache.has(i)) {
+      const item = playbackQueue[i];
+      if (item && item.text) {
+        batch.push({ index: i, text: item.text });
+      }
+    }
   }
+  if (batch.length === 0) {
+    // すべてキャッシュ済みなら再生
+    playFromCache(startIndex);
+    return;
+  }
+  chrome.runtime.sendMessage({ command: "batchFetch", batch }, (response) => {
+    if (response && response.audioDataUrls) {
+      response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
+        audioCache.set(index, audioDataUrl);
+      });
+    }
+    playFromCache(startIndex);
+  });
+}
+
+// バッチでプリフェッチ
+function prefetchBatch(startIndex) {
+  const batch = [];
+  for (
+    let i = startIndex;
+    i <
+    Math.min(playbackQueue.length, startIndex + PREFETCH_AHEAD * BATCH_SIZE);
+    i += BATCH_SIZE
+  ) {
+    for (let j = i; j < Math.min(playbackQueue.length, i + BATCH_SIZE); j++) {
+      if (!audioCache.has(j)) {
+        const item = playbackQueue[j];
+        if (item && item.text) {
+          batch.push({ index: j, text: item.text });
+        }
+      }
+    }
+  }
+  if (batch.length > 0) {
+    setTimeout(() => {
+      chrome.runtime.sendMessage(
+        { command: "batchFetch", batch },
+        (response) => {
+          if (response && response.audioDataUrls) {
+            response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
+              audioCache.set(index, audioDataUrl);
+            });
+          }
+        }
+      );
+    }, 1000); // 1秒遅延
+  }
+}
+
+// 全キューを一括フェッチ
+function fullBatchFetch(callback) {
+  const batch = [];
+  for (let i = 0; i < playbackQueue.length; i++) {
+    if (!audioCache.has(i)) {
+      const item = playbackQueue[i];
+      if (item && item.text) {
+        batch.push({ index: i, text: item.text });
+      }
+    }
+  }
+  if (batch.length === 0) {
+    console.log("fullBatchFetch: All items already cached");
+    callback(); // すべてキャッシュ済みなら即再生
+    return;
+  }
+  console.log("fullBatchFetch: Fetching", batch.length, "items in batch");
+  chrome.runtime.sendMessage(
+    { command: "fullBatchFetch", batch },
+    (response) => {
+      if (response && response.audioDataUrls) {
+        console.log(
+          "fullBatchFetch: Received",
+          response.audioDataUrls.length,
+          "audio URLs"
+        );
+        response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
+          audioCache.set(index, audioDataUrl);
+          console.log("fullBatchFetch: Cached audio for index:", index);
+        });
+        console.log("fullBatchFetch: All audio cached, starting playback");
+      } else {
+        console.error("fullBatchFetch: No response or audioDataUrls");
+      }
+      callback();
+    }
+  );
 }
 
 function injectStyles(filePath) {

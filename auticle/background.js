@@ -63,4 +63,73 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return true; // 非同期で sendResponse を使うため true を返す
   }
+
+  // バッチフェッチ
+  if (message.command === "batchFetch") {
+    const promises = message.batch.map(({ index, text }) => {
+      const cleanedText = cleanText(text);
+      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(
+        cleanedText
+      )}&tl=ja`;
+
+      return fetch(ttsUrl)
+        .then((response) => response.blob())
+        .then((blob) => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () =>
+              resolve({ index, audioDataUrl: reader.result });
+            reader.readAsDataURL(blob);
+          });
+        })
+        .catch((error) => {
+          console.error("TTS Batch Fetch Error for index", index, ":", error);
+          return { index, error: String(error) };
+        });
+    });
+
+    Promise.all(promises).then((results) => {
+      const audioDataUrls = results.filter((r) => r.audioDataUrl);
+      sendResponse({ audioDataUrls });
+    });
+
+    return true;
+  }
+
+  // 全キュー一括フェッチ
+  if (message.command === "fullBatchFetch") {
+    const promises = message.batch.map(({ index, text }) => {
+      const cleanedText = cleanText(text);
+      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(
+        cleanedText
+      )}&tl=ja`;
+
+      return fetch(ttsUrl)
+        .then((response) => response.blob())
+        .then((blob) => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () =>
+              resolve({ index, audioDataUrl: reader.result });
+            reader.readAsDataURL(blob);
+          });
+        })
+        .catch((error) => {
+          console.error(
+            "TTS Full Batch Fetch Error for index",
+            index,
+            ":",
+            error
+          );
+          return { index, error: String(error) };
+        });
+    });
+
+    Promise.all(promises).then((results) => {
+      const audioDataUrls = results.filter((r) => r.audioDataUrl);
+      sendResponse({ audioDataUrls });
+    });
+
+    return true;
+  }
 });
