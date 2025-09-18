@@ -1,6 +1,6 @@
 {
   "name": "Auticle",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A browser extension to read articles aloud.",
   "manifest_version": 3,
   "permissions": ["storage"],
@@ -24,7 +24,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["styles.css"],
+      "resources": ["styles.css", "lib/Readability.js"],
       "matches": ["<all_urls>"]
     }
   ]

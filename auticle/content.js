@@ -11,6 +11,53 @@ let audioCache = new Map();
 // 先読みするチャンク数
 const PREFETCH_AHEAD = 2;
 
+// ----- Readability 注入 & カスタムルール定義 -----
+// ドメインごとの独自抽出ルール（まずは qiita.com のプレースホルダ）
+const customRules = {
+  "qiita.com": {
+    // Qiita の記事構造に合わせた優先セレクタ群。
+    // テキスト読み上げでは段落（p）、箇条書きの li、見出し（h1..h6）、引用、コードブロックなどを
+    // 順序通りに抽出したい。Qiita の記事本文は `#personal-public-article-body .mdContent-inner` に入る。
+    selectors: [
+      // まずは記事本文コンテナ内のブロック要素を優先して取得
+      "#personal-public-article-body .mdContent-inner > p",
+      "#personal-public-article-body .mdContent-inner > ul > li",
+      "#personal-public-article-body .mdContent-inner > ol > li",
+      "#personal-public-article-body .mdContent-inner > h1",
+      "#personal-public-article-body .mdContent-inner > h2",
+      "#personal-public-article-body .mdContent-inner > h3",
+      "#personal-public-article-body .mdContent-inner > h4",
+      "#personal-public-article-body .mdContent-inner > h5",
+      "#personal-public-article-body .mdContent-inner > h6",
+      "#personal-public-article-body .mdContent-inner > blockquote",
+      "#personal-public-article-body .mdContent-inner > pre",
+      // 旧クラス名や別バリアントもカバー
+      ".it-Article .rendered-body > p",
+      ".it-Article .rendered-body li",
+      ".rendered-body > p",
+      ".article_body > p",
+      // 最終フォールバックは article 内の段落・リスト
+      "article > p",
+      "article > ul > li",
+      "article > ol > li",
+    ],
+  },
+};
+// ページに Readability ライブラリを注入する（web_accessible_resources に登録済み）
+function injectReadabilityLib() {
+  try {
+    const src = chrome.runtime.getURL("lib/Readability.js");
+    // 既に注入済みならスキップ
+    if (document.querySelector(`script[src="${src}"]`)) return;
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = false;
+    document.documentElement.appendChild(script);
+  } catch (e) {
+    console.error("injectReadabilityLib error:", e);
+  }
+}
+
 // background.jsからの再生命令を待つ
 chrome.runtime.onMessage.addListener((message) => {
   if (message.command === "playAudio") {
@@ -70,17 +117,36 @@ function updatePageState(enabled) {
 }
 
 function preparePage() {
-  const selectors = "article p, main p, .post-body p, .entry-content p";
-  const paragraphs = document.querySelectorAll(selectors);
-  paragraphs.forEach((p, index) => {
-    p.dataset.auticleId = index;
-    p.classList.add("auticle-clickable");
-  });
+  // ドメインを取得
+  const hostname = window.location.hostname;
+  if (customRules[hostname]) {
+    // 独自ルールで要素を準備
+    const rule = customRules[hostname];
+    let globalId = 0;
+    rule.selectors.forEach((selector) => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach((el) => {
+        el.dataset.auticleId = globalId;
+        el.classList.add("auticle-clickable");
+        globalId++;
+      });
+    });
+  } else {
+    // フォールバック
+    const selectors = "article p, main p, .post-body p, .entry-content p";
+    const paragraphs = document.querySelectorAll(selectors);
+    paragraphs.forEach((p, index) => {
+      p.dataset.auticleId = index;
+      p.classList.add("auticle-clickable");
+    });
+  }
   if (!isClickAttached) {
     document.addEventListener("click", handleClick, true);
     isClickAttached = true;
   }
   injectStyles("styles.css");
+  // Readability ライブラリを注入
+  injectReadabilityLib();
 }
 
 function cleanupPage() {
@@ -102,31 +168,130 @@ function handleClick(event) {
   if (!target) return;
   event.preventDefault();
   event.stopPropagation();
-  const startId = parseInt(target.dataset.auticleId, 10);
-  const allParagraphs = Array.from(
-    document.querySelectorAll(".auticle-clickable")
-  );
 
-  // クリックされた段落以降のテキストを収集し、段落ごとに200文字程度のチャンクに分割してキューに格納
-  playbackQueue = [];
-  for (let p of allParagraphs) {
-    const currentId = parseInt(p.dataset.auticleId, 10);
-    if (currentId < startId) continue;
-    const paragraphText = (p.textContent || "").trim();
-    if (!paragraphText) continue;
+  // 現在のドメインを取得
+  const hostname = window.location.hostname;
 
-    // 200文字ごとに分割する（日本語を考慮し単純に slice を使う）
-    const chunkSize = 200;
-    for (let i = 0; i < paragraphText.length; i += chunkSize) {
-      const chunk = paragraphText.slice(i, i + chunkSize);
-      playbackQueue.push({ text: chunk, paragraphId: currentId });
+  // 優先順位1: 独自ルール
+  let queue = [];
+  if (customRules[hostname]) {
+    queue = buildQueueWithCustomRule(customRules[hostname]);
+  }
+
+  // 優先順位2: Readability.js（キューが空の場合）
+  if (queue.length === 0) {
+    try {
+      queue = buildQueueWithReadability();
+    } catch (e) {
+      console.error("Readability extraction failed:", e);
     }
   }
 
-  if (playbackQueue.length > 0) {
-    queueIndex = 0;
+  // 優先順位3: フォールバック（キューが空の場合）
+  if (queue.length === 0) {
+    queue = buildQueueWithFallback();
+  }
+
+  // キューが得られたら再生開始
+  if (queue.length > 0) {
+    playbackQueue = queue;
+    // クリックされた要素の paragraphId を取得
+    const clickedId = parseInt(target.dataset.auticleId);
+    if (!isNaN(clickedId)) {
+      // クリックされた ID の最初のアイテムのインデックスを探す
+      const startIndex = queue.findIndex(
+        (item) => item.paragraphId === clickedId
+      );
+      if (startIndex !== -1) {
+        queueIndex = startIndex;
+      } else {
+        queueIndex = 0;
+      }
+    } else {
+      queueIndex = 0;
+    }
     playQueue();
   }
+}
+
+// 独自ルールでキューを構築
+function buildQueueWithCustomRule(rule) {
+  const queue = [];
+  rule.selectors.forEach((selector) => {
+    const elements = document.querySelectorAll(selector);
+    elements.forEach((el) => {
+      const text = (el.textContent || "").trim();
+      if (text) {
+        const paragraphId = parseInt(el.dataset.auticleId);
+        // 200文字ごとに分割
+        const chunkSize = 200;
+        for (let i = 0; i < text.length; i += chunkSize) {
+          const chunk = text.slice(i, i + chunkSize);
+          queue.push({ text: chunk, paragraphId });
+        }
+      }
+    });
+  });
+
+  return queue;
+}
+
+// Readability.js でキューを構築
+function buildQueueWithReadability() {
+  // Readability が利用可能かチェック
+  if (typeof Readability === "undefined") {
+    throw new Error("Readability is not available");
+  }
+
+  const documentClone = document.cloneNode(true);
+  const reader = new Readability(documentClone);
+  const article = reader.parse();
+
+  if (!article || !article.content) {
+    throw new Error("Readability failed to extract content");
+  }
+
+  // 抽出した HTML をテキストに変換し、段落に分割
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = article.content;
+  const paragraphs = tempDiv.querySelectorAll("p");
+
+  const queue = [];
+  paragraphs.forEach((p, index) => {
+    const text = (p.textContent || "").trim();
+    if (text) {
+      // 200文字ごとに分割
+      const chunkSize = 200;
+      for (let i = 0; i < text.length; i += chunkSize) {
+        const chunk = text.slice(i, i + chunkSize);
+        queue.push({ text: chunk, paragraphId: index });
+      }
+    }
+  });
+
+  return queue;
+}
+
+// フォールバックでキューを構築（既存の単純セレクタ）
+function buildQueueWithFallback() {
+  const selectors = "article p, main p, .post-body p, .entry-content p";
+  const paragraphs = document.querySelectorAll(selectors);
+
+  const queue = [];
+  paragraphs.forEach((p) => {
+    const text = (p.textContent || "").trim();
+    if (text) {
+      const paragraphId = parseInt(p.dataset.auticleId);
+      // 200文字ごとに分割
+      const chunkSize = 200;
+      for (let i = 0; i < text.length; i += chunkSize) {
+        const chunk = text.slice(i, i + chunkSize);
+        queue.push({ text: chunk, paragraphId });
+      }
+    }
+  });
+
+  return queue;
 }
 
 // 再生キューを再生する
