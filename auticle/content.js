@@ -3,6 +3,9 @@ let audioPlayer = new Audio();
 let isClickAttached = false;
 let isEnabled = false;
 
+// 再生中かどうかを追跡
+let isPlaying = false;
+
 // 再生キュー（{text, paragraphId} の配列）と現在のキュー位置
 let playbackQueue = [];
 let queueIndex = 0;
@@ -61,6 +64,7 @@ function injectReadabilityLib() {
 // background.jsからの再生命令を待つ
 chrome.runtime.onMessage.addListener((message) => {
   if (message.command === "playAudio") {
+    isPlaying = true;
     // ★★★ これが最終的な修正です ★★★
 
     // プレーヤーが「再生準備完了(canplay)」になったら一度だけ実行するリスナーを登録
@@ -82,11 +86,35 @@ chrome.runtime.onMessage.addListener((message) => {
 
 // audio の再生終了を受け取り、キューの次へ進める
 audioPlayer.addEventListener("ended", () => {
+  console.log(
+    "Audio ended, current queueIndex:",
+    queueIndex,
+    "queue length:",
+    playbackQueue.length
+  );
+  queueIndex += 1;
+  if (queueIndex < playbackQueue.length) {
+    console.log("Moving to next item, new queueIndex:", queueIndex);
+    playQueue();
+  } else {
+    console.log("Queue finished");
+    isPlaying = false;
+    // キュー終了時にハイライト解除
+    updateHighlight(null);
+    playbackQueue = [];
+    queueIndex = 0;
+  }
+});
+
+// audio のエラーを処理
+audioPlayer.addEventListener("error", (e) => {
+  console.error("Audio error:", e);
+  isPlaying = false;
+  // エラー時は次のアイテムに進む
   queueIndex += 1;
   if (queueIndex < playbackQueue.length) {
     playQueue();
   } else {
-    // キュー終了時にハイライト解除
     updateHighlight(null);
     playbackQueue = [];
     queueIndex = 0;
@@ -127,22 +155,27 @@ function preparePage() {
     );
     if (container) {
       const allElements = container.querySelectorAll("*");
+      let paragraphId = 0;
       allElements.forEach((el) => {
         const tagName = el.tagName.toLowerCase();
+        const text = (el.textContent || "").trim();
         if (
-          tagName === "p" ||
-          (tagName === "li" && el.closest("ul")) ||
-          (tagName === "li" && el.closest("ol")) ||
-          tagName === "h1" ||
-          tagName === "h2" ||
-          tagName === "h3" ||
-          tagName === "h4" ||
-          tagName === "h5" ||
-          tagName === "h6" ||
-          tagName === "blockquote" ||
-          tagName === "pre"
+          text &&
+          (tagName === "p" ||
+            (tagName === "li" && el.closest("ul")) ||
+            (tagName === "li" && el.closest("ol")) ||
+            tagName === "h1" ||
+            tagName === "h2" ||
+            tagName === "h3" ||
+            tagName === "h4" ||
+            tagName === "h5" ||
+            tagName === "h6" ||
+            tagName === "blockquote" ||
+            tagName === "pre")
         ) {
+          el.dataset.auticleId = paragraphId;
           el.classList.add("auticle-clickable");
+          paragraphId++;
         }
       });
     }
@@ -166,6 +199,7 @@ function preparePage() {
 
 function cleanupPage() {
   audioPlayer.pause();
+  isPlaying = false;
   const paragraphs = document.querySelectorAll(".auticle-clickable");
   paragraphs.forEach((p) => {
     p.classList.remove("auticle-clickable");
@@ -184,16 +218,48 @@ function handleClick(event) {
   event.preventDefault();
   event.stopPropagation();
 
-  // 現在のドメインを取得
+  console.log(
+    "handleClick: Clicked element:",
+    target,
+    "ID:",
+    target.dataset.auticleId,
+    "isPlaying:",
+    isPlaying
+  );
+
+  // 再生中の場合、位置変更のみ
+  if (isPlaying && playbackQueue.length > 0) {
+    const clickedId = parseInt(target.dataset.auticleId);
+    if (!isNaN(clickedId)) {
+      const startIndex = playbackQueue.findIndex(
+        (item) => item.paragraphId === clickedId
+      );
+      if (startIndex !== -1) {
+        queueIndex = startIndex;
+        console.log(
+          "handleClick: Jumping to index:",
+          startIndex,
+          "for ID:",
+          clickedId
+        );
+        // 現在の再生を停止し、新しい位置から再生
+        audioPlayer.pause();
+        playQueue();
+      } else {
+        console.warn("handleClick: ID not found in current queue");
+      }
+    }
+    return;
+  }
+
+  // 再生中でない場合、キュー構築
   const hostname = window.location.hostname;
 
-  // 優先順位1: 独自ルール
   let queue = [];
   if (customRules[hostname]) {
     queue = buildQueueWithCustomRule(customRules[hostname]);
   }
 
-  // 優先順位2: Readability.js（キューが空の場合）
   if (queue.length === 0) {
     try {
       queue = buildQueueWithReadability();
@@ -202,30 +268,38 @@ function handleClick(event) {
     }
   }
 
-  // 優先順位3: フォールバック（キューが空の場合）
   if (queue.length === 0) {
     queue = buildQueueWithFallback();
   }
 
-  // キューが得られたら再生開始
+  console.log("handleClick: Built queue length:", queue.length);
+
   if (queue.length > 0) {
     playbackQueue = queue;
-    // クリックされた要素の paragraphId を取得
     const clickedId = parseInt(target.dataset.auticleId);
     if (!isNaN(clickedId)) {
-      // クリックされた ID の最初のアイテムのインデックスを探す
       const startIndex = queue.findIndex(
         (item) => item.paragraphId === clickedId
       );
       if (startIndex !== -1) {
         queueIndex = startIndex;
+        console.log(
+          "handleClick: Starting at index:",
+          startIndex,
+          "for ID:",
+          clickedId
+        );
       } else {
         queueIndex = 0;
+        console.warn("handleClick: ID not found in queue, starting at 0");
       }
     } else {
       queueIndex = 0;
+      console.warn("handleClick: No valid ID, starting at 0");
     }
     playQueue();
+  } else {
+    console.error("handleClick: No queue built");
   }
 }
 
@@ -234,11 +308,20 @@ function buildQueueWithCustomRule(rule) {
   const container = document.querySelector(
     "#personal-public-article-body .mdContent-inner"
   );
-  if (!container) return [];
+  if (!container) {
+    console.warn("buildQueueWithCustomRule: Container not found");
+    return [];
+  }
 
   const allElements = container.querySelectorAll("*");
   const queue = [];
   let paragraphId = 0;
+
+  console.log(
+    "buildQueueWithCustomRule: Processing",
+    allElements.length,
+    "elements"
+  );
 
   allElements.forEach((el) => {
     const tagName = el.tagName.toLowerCase();
@@ -259,6 +342,14 @@ function buildQueueWithCustomRule(rule) {
     ) {
       el.dataset.auticleId = paragraphId;
       el.classList.add("auticle-clickable");
+      console.log(
+        "buildQueueWithCustomRule: Added element",
+        tagName,
+        "ID:",
+        paragraphId,
+        "text length:",
+        text.length
+      );
       // 200文字ごとに分割
       const chunkSize = 200;
       for (let i = 0; i < text.length; i += chunkSize) {
@@ -269,6 +360,11 @@ function buildQueueWithCustomRule(rule) {
     }
   });
 
+  console.log(
+    "buildQueueWithCustomRule: Built queue with",
+    queue.length,
+    "chunks"
+  );
   return queue;
 }
 
@@ -332,9 +428,29 @@ function buildQueueWithFallback() {
 
 // 再生キューを再生する
 function playQueue() {
-  if (!(queueIndex >= 0 && queueIndex < playbackQueue.length)) return;
+  if (!(queueIndex >= 0 && queueIndex < playbackQueue.length)) {
+    console.warn(
+      "playQueue: Invalid queueIndex:",
+      queueIndex,
+      "queue length:",
+      playbackQueue.length
+    );
+    return;
+  }
   const item = playbackQueue[queueIndex];
-  if (!item || !item.text) return;
+  if (!item || !item.text) {
+    console.warn("playQueue: Invalid item at index:", queueIndex, item);
+    return;
+  }
+
+  console.log(
+    "playQueue: Playing item at index:",
+    queueIndex,
+    "text length:",
+    item.text.length,
+    "paragraphId:",
+    item.paragraphId
+  );
 
   // 現在の段落をハイライト
   updateHighlight(item.paragraphId);
@@ -342,6 +458,8 @@ function playQueue() {
   // まずキャッシュをチェック。あれば即座に再生、なければ通常の play 要求を送る
   const cached = audioCache.get(queueIndex);
   if (cached) {
+    console.log("playQueue: Using cached audio for index:", queueIndex);
+    isPlaying = true;
     // 既に取得済みの dataUrl をセットして再生
     audioPlayer.addEventListener(
       "canplay",
@@ -353,6 +471,7 @@ function playQueue() {
     );
     audioPlayer.src = cached;
   } else {
+    console.log("playQueue: Requesting audio for index:", queueIndex);
     // 通常の再生要求
     chrome.runtime.sendMessage({ command: "play", text: item.text });
   }
@@ -391,12 +510,14 @@ function updateHighlight(paragraphId) {
 
   if (paragraphId === null || paragraphId === undefined) return;
 
-  const selector = `[data-auticle-id=\"${paragraphId}\"]`;
+  const selector = `[data-auticle-id="${paragraphId}"]`;
   const el = document.querySelector(selector);
   if (el) {
     el.classList.add("auticle-highlight");
     // 可能ならスクロールして見える位置にする
     el.scrollIntoView({ behavior: "smooth", block: "center" });
+  } else {
+    console.warn(`Element with data-auticle-id="${paragraphId}" not found`);
   }
 }
 
