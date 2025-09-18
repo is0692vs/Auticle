@@ -10,18 +10,21 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // Save state on change
-  toggleSwitch.addEventListener("change", function () {
+  toggleSwitch.addEventListener("change", async function () {
     const enabled = toggleSwitch.checked;
     chrome.storage.local.set({ enabled: enabled });
 
-    // Send message to active tab
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-      if (tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          command: "stateChange",
-          enabled: enabled,
-        });
-      }
-    });
+    // Inject content script and send message to active tab
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs[0] && !tabs[0].url.startsWith("chrome://")) {
+      await chrome.scripting.executeScript({
+        target: { tabId: tabs[0].id },
+        files: ["content.js"],
+      });
+      chrome.tabs.sendMessage(tabs[0].id, {
+        command: "stateChange",
+        enabled: enabled,
+      });
+    }
   });
 });
