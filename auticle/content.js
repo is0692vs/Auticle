@@ -3,6 +3,14 @@ let audioPlayer = new Audio();
 let isClickAttached = false;
 let isEnabled = false;
 
+// 再生キュー（{text, paragraphId} の配列）と現在のキュー位置
+let playbackQueue = [];
+let queueIndex = 0;
+// prefetch cache: queueIndex -> audioDataUrl
+let audioCache = new Map();
+// 先読みするチャンク数
+const PREFETCH_AHEAD = 2;
+
 // background.jsからの再生命令を待つ
 chrome.runtime.onMessage.addListener((message) => {
   if (message.command === "playAudio") {
@@ -22,6 +30,19 @@ chrome.runtime.onMessage.addListener((message) => {
     // リスナーを登録してから、音源ソースを設定する
     audioPlayer.src = message.audioDataUrl;
     // ★★★★★★★★★★★★★★★★★★★★★
+  }
+});
+
+// audio の再生終了を受け取り、キューの次へ進める
+audioPlayer.addEventListener("ended", () => {
+  queueIndex += 1;
+  if (queueIndex < playbackQueue.length) {
+    playQueue();
+  } else {
+    // キュー終了時にハイライト解除
+    updateHighlight(null);
+    playbackQueue = [];
+    queueIndex = 0;
   }
 });
 
@@ -82,18 +103,99 @@ function handleClick(event) {
   event.preventDefault();
   event.stopPropagation();
   const startId = parseInt(target.dataset.auticleId, 10);
-  const allParagraphs = document.querySelectorAll(".auticle-clickable");
-  let textToPlay = "";
-  allParagraphs.forEach((p) => {
-    const currentId = parseInt(p.dataset.auticleId, 10);
-    if (currentId >= startId) {
-      textToPlay += p.textContent + " ";
-    }
-  });
+  const allParagraphs = Array.from(
+    document.querySelectorAll(".auticle-clickable")
+  );
 
-  if (textToPlay.trim()) {
-    const shortText = textToPlay.substring(0, 200);
-    chrome.runtime.sendMessage({ command: "play", text: shortText });
+  // クリックされた段落以降のテキストを収集し、段落ごとに200文字程度のチャンクに分割してキューに格納
+  playbackQueue = [];
+  for (let p of allParagraphs) {
+    const currentId = parseInt(p.dataset.auticleId, 10);
+    if (currentId < startId) continue;
+    const paragraphText = (p.textContent || "").trim();
+    if (!paragraphText) continue;
+
+    // 200文字ごとに分割する（日本語を考慮し単純に slice を使う）
+    const chunkSize = 200;
+    for (let i = 0; i < paragraphText.length; i += chunkSize) {
+      const chunk = paragraphText.slice(i, i + chunkSize);
+      playbackQueue.push({ text: chunk, paragraphId: currentId });
+    }
+  }
+
+  if (playbackQueue.length > 0) {
+    queueIndex = 0;
+    playQueue();
+  }
+}
+
+// 再生キューを再生する
+function playQueue() {
+  if (!(queueIndex >= 0 && queueIndex < playbackQueue.length)) return;
+  const item = playbackQueue[queueIndex];
+  if (!item || !item.text) return;
+
+  // 現在の段落をハイライト
+  updateHighlight(item.paragraphId);
+
+  // まずキャッシュをチェック。あれば即座に再生、なければ通常の play 要求を送る
+  const cached = audioCache.get(queueIndex);
+  if (cached) {
+    // 既に取得済みの dataUrl をセットして再生
+    audioPlayer.addEventListener(
+      "canplay",
+      () => {
+        audioPlayer.playbackRate = 2.0;
+        audioPlayer.play();
+      },
+      { once: true }
+    );
+    audioPlayer.src = cached;
+  } else {
+    // 通常の再生要求
+    chrome.runtime.sendMessage({ command: "play", text: item.text });
+  }
+
+  // 次の N 個を非同期でプリフェッチ
+  prefetchNext(queueIndex + 1);
+}
+
+// 指定された startIndex 以降で PREFETCH_AHEAD 個を先読みして audioCache に格納
+function prefetchNext(startIndex) {
+  for (
+    let i = startIndex;
+    i < Math.min(playbackQueue.length, startIndex + PREFETCH_AHEAD);
+    i++
+  ) {
+    if (audioCache.has(i)) continue;
+    const item = playbackQueue[i];
+    if (!item || !item.text) continue;
+    // background に fetch 要求を送り、sendResponse で audioDataUrl を受け取る
+    chrome.runtime.sendMessage(
+      { command: "fetch", text: item.text },
+      (response) => {
+        if (response && response.audioDataUrl) {
+          audioCache.set(i, response.audioDataUrl);
+        }
+      }
+    );
+  }
+}
+
+// 指定した段落IDをハイライト。null なら解除。
+function updateHighlight(paragraphId) {
+  // 既存ハイライトをすべて削除
+  const prev = document.querySelectorAll(".auticle-highlight");
+  prev.forEach((el) => el.classList.remove("auticle-highlight"));
+
+  if (paragraphId === null || paragraphId === undefined) return;
+
+  const selector = `[data-auticle-id=\"${paragraphId}\"]`;
+  const el = document.querySelector(selector);
+  if (el) {
+    el.classList.add("auticle-highlight");
+    // 可能ならスクロールして見える位置にする
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }
 
