@@ -1,15 +1,31 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Auticle Popup</title>
+    <meta charset="UTF-8" />
     <link rel="stylesheet" href="popup.css" />
+    <style>
+      body {
+        width: 200px;
+        padding: 10px;
+        font-family: sans-serif;
+      }
+      .control-group {
+        margin-bottom: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+    </style>
   </head>
   <body>
-    <h1>Auticle Popup</h1>
-    <label class="switch">
-      <input type="checkbox" id="toggle-switch" />
-      <span class="slider"></span>
-    </label>
+    <h1>Auticle</h1>
+    <div class="control-group">
+      <label for="toggle-switch">読み上げモード</label>
+      <label class="switch">
+        <input type="checkbox" id="toggle-switch" />
+        <span class="slider round"></span>
+      </label>
+    </div>
     <script src="popup.js"></script>
   </body>
 </html>

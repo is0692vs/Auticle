@@ -1,77 +1,109 @@
-console.log("Content script placeholder.");
+// content.js
+let audioPlayer = new Audio();
+let isClickAttached = false;
+let isEnabled = false;
 
-if (!window.auticleListenerAdded) {
-  chrome.runtime.onMessage.addListener(function (
-    message,
-    sender,
-    sendResponse
-  ) {
-    if (message.command === "stateChange") {
-      console.log("Auticle state changed to:", message.enabled);
-      if (message.enabled) {
-        preparePage();
-      } else {
-        cleanupPage();
-      }
-    }
-  });
-  window.auticleListenerAdded = true;
+// background.jsからの再生命令を待つ
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.command === "playAudio") {
+    // ★★★ これが最終的な修正です ★★★
+
+    // プレーヤーが「再生準備完了(canplay)」になったら一度だけ実行するリスナーを登録
+    audioPlayer.addEventListener(
+      "canplay",
+      () => {
+        // 準備が完了したこのタイミングで速度を設定し、再生を開始する
+        audioPlayer.playbackRate = 2.0;
+        audioPlayer.play();
+      },
+      { once: true }
+    ); // { once: true } でイベントが一度だけ実行されるようにする
+
+    // リスナーを登録してから、音源ソースを設定する
+    audioPlayer.src = message.audioDataUrl;
+    // ★★★★★★★★★★★★★★★★★★★★★
+  }
+});
+
+// ストレージの変更（主に有効/無効の変更）を監視
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.enabled !== undefined) {
+    isEnabled = !!changes.enabled.newValue;
+    updatePageState(isEnabled);
+  }
+});
+
+// ページ読み込み時に一度だけ、現在の状態で初期化
+chrome.storage.local.get(["enabled"], (result) => {
+  isEnabled = !!result.enabled;
+  updatePageState(isEnabled);
+});
+
+// ページのON/OFF状態を更新するメイン関数
+function updatePageState(enabled) {
+  if (enabled) {
+    preparePage();
+  } else {
+    cleanupPage();
+  }
 }
 
 function preparePage() {
-  // Guard clause: if already prepared, skip
-  if (document.querySelector(".auticle-clickable")) {
-    return;
-  }
-
-  // Select paragraph elements in article or main
-  const selectors = "article p, main p, .post-body p";
+  const selectors = "article p, main p, .post-body p, .entry-content p";
   const paragraphs = document.querySelectorAll(selectors);
-  paragraphs.forEach((element, index) => {
-    element.dataset.auticleId = index;
-    element.classList.add("auticle-clickable");
+  paragraphs.forEach((p, index) => {
+    p.dataset.auticleId = index;
+    p.classList.add("auticle-clickable");
   });
-
-  // Inject styles
-  injectStyles();
-
-  // Add click event listener for triggering playback
-  document.addEventListener("click", handleClick);
+  if (!isClickAttached) {
+    document.addEventListener("click", handleClick, true);
+    isClickAttached = true;
+  }
+  injectStyles("styles.css");
 }
 
 function cleanupPage() {
-  // Remove classes and data attributes
-  const clickableElements = document.querySelectorAll(".auticle-clickable");
-  clickableElements.forEach((element) => {
-    element.classList.remove("auticle-clickable");
-    delete element.dataset.auticleId;
+  audioPlayer.pause();
+  const paragraphs = document.querySelectorAll(".auticle-clickable");
+  paragraphs.forEach((p) => {
+    p.classList.remove("auticle-clickable");
+    delete p.dataset.auticleId;
   });
-
-  // Remove injected styles
+  if (isClickAttached) {
+    document.removeEventListener("click", handleClick, true);
+    isClickAttached = false;
+  }
   removeStyles();
-
-  // Remove click event listener
-  document.removeEventListener("click", handleClick);
 }
 
 function handleClick(event) {
   const target = event.target.closest(".auticle-clickable");
-  if (target) {
-    const id = parseInt(target.dataset.auticleId);
-    const paragraphs = document.querySelectorAll(".auticle-clickable");
-    let text = "";
-    for (let i = id; i < paragraphs.length; i++) {
-      text += paragraphs[i].textContent + "\n\n";
+  if (!target) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const startId = parseInt(target.dataset.auticleId, 10);
+  const allParagraphs = document.querySelectorAll(".auticle-clickable");
+  let textToPlay = "";
+  allParagraphs.forEach((p) => {
+    const currentId = parseInt(p.dataset.auticleId, 10);
+    if (currentId >= startId) {
+      textToPlay += p.textContent + " ";
     }
-    chrome.runtime.sendMessage({ command: "play", text: text });
+  });
+
+  if (textToPlay.trim()) {
+    const shortText = textToPlay.substring(0, 200);
+    chrome.runtime.sendMessage({ command: "play", text: shortText });
   }
 }
 
-function injectStyles() {
+function injectStyles(filePath) {
+  if (document.getElementById("auticle-styles")) return;
   const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = chrome.runtime.getURL("styles.css");
   link.id = "auticle-styles";
+  link.rel = "stylesheet";
+  link.type = "text/css";
+  link.href = chrome.runtime.getURL(filePath);
   document.head.appendChild(link);
 }
 

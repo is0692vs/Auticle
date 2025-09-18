@@ -1,22 +1,27 @@
-chrome.runtime.onInstalled.addListener(() => {
-  console.log("Auticle extension installed.");
-});
+// background.js
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.command === "play") {
+    const text = message.text;
+    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(
+      text
+    )}&tl=ja`;
 
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status === "complete" && !tab.url.startsWith("chrome://")) {
-    // Inject content script
-    await chrome.scripting.executeScript({
-      target: { tabId: tabId },
-      files: ["content.js"],
-    });
+    fetch(ttsUrl)
+      .then((response) => response.blob())
+      .then((blob) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (sender.tab?.id) {
+            chrome.tabs.sendMessage(sender.tab.id, {
+              command: "playAudio",
+              audioDataUrl: e.target.result,
+            });
+          }
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch((error) => console.error("TTS Fetch Error:", error));
 
-    // Send current state
-    chrome.storage.local.get(["enabled"], (result) => {
-      const enabled = result.enabled || false;
-      chrome.tabs.sendMessage(tabId, {
-        command: "stateChange",
-        enabled: enabled,
-      });
-    });
+    return true; // 非同期で応答を返すためtrueを返す
   }
 });
