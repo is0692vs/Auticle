@@ -122,15 +122,30 @@ function preparePage() {
   if (customRules[hostname]) {
     // 独自ルールで要素を準備
     const rule = customRules[hostname];
-    let globalId = 0;
-    rule.selectors.forEach((selector) => {
-      const elements = document.querySelectorAll(selector);
-      elements.forEach((el) => {
-        el.dataset.auticleId = globalId;
-        el.classList.add("auticle-clickable");
-        globalId++;
+    const container = document.querySelector(
+      "#personal-public-article-body .mdContent-inner"
+    );
+    if (container) {
+      const allElements = container.querySelectorAll("*");
+      allElements.forEach((el) => {
+        const tagName = el.tagName.toLowerCase();
+        if (
+          tagName === "p" ||
+          (tagName === "li" && el.closest("ul")) ||
+          (tagName === "li" && el.closest("ol")) ||
+          tagName === "h1" ||
+          tagName === "h2" ||
+          tagName === "h3" ||
+          tagName === "h4" ||
+          tagName === "h5" ||
+          tagName === "h6" ||
+          tagName === "blockquote" ||
+          tagName === "pre"
+        ) {
+          el.classList.add("auticle-clickable");
+        }
       });
-    });
+    }
   } else {
     // フォールバック
     const selectors = "article p, main p, .post-body p, .entry-content p";
@@ -216,21 +231,42 @@ function handleClick(event) {
 
 // 独自ルールでキューを構築
 function buildQueueWithCustomRule(rule) {
+  const container = document.querySelector(
+    "#personal-public-article-body .mdContent-inner"
+  );
+  if (!container) return [];
+
+  const allElements = container.querySelectorAll("*");
   const queue = [];
-  rule.selectors.forEach((selector) => {
-    const elements = document.querySelectorAll(selector);
-    elements.forEach((el) => {
-      const text = (el.textContent || "").trim();
-      if (text) {
-        const paragraphId = parseInt(el.dataset.auticleId);
-        // 200文字ごとに分割
-        const chunkSize = 200;
-        for (let i = 0; i < text.length; i += chunkSize) {
-          const chunk = text.slice(i, i + chunkSize);
-          queue.push({ text: chunk, paragraphId });
-        }
+  let paragraphId = 0;
+
+  allElements.forEach((el) => {
+    const tagName = el.tagName.toLowerCase();
+    const text = (el.textContent || "").trim();
+    if (
+      text &&
+      (tagName === "p" ||
+        (tagName === "li" && el.closest("ul")) ||
+        (tagName === "li" && el.closest("ol")) ||
+        tagName === "h1" ||
+        tagName === "h2" ||
+        tagName === "h3" ||
+        tagName === "h4" ||
+        tagName === "h5" ||
+        tagName === "h6" ||
+        tagName === "blockquote" ||
+        tagName === "pre")
+    ) {
+      el.dataset.auticleId = paragraphId;
+      el.classList.add("auticle-clickable");
+      // 200文字ごとに分割
+      const chunkSize = 200;
+      for (let i = 0; i < text.length; i += chunkSize) {
+        const chunk = text.slice(i, i + chunkSize);
+        queue.push({ text: chunk, paragraphId });
       }
-    });
+      paragraphId++;
+    }
   });
 
   return queue;
