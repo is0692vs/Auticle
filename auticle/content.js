@@ -91,6 +91,26 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
+// popup.jsからのメッセージを待つ
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.command === "togglePauseResume") {
+    if (isPlaying) {
+      // 一時停止
+      audioPlayer.pause();
+      isPlaying = false;
+      console.log("Playback paused");
+      sendResponse({ isPlaying: false });
+    } else if (playbackQueue.length > 0) {
+      // 再開
+      playQueue();
+      console.log("Playback resumed");
+      sendResponse({ isPlaying: true });
+    } else {
+      sendResponse({ isPlaying: false });
+    }
+  }
+});
+
 // audio の再生終了を受け取り、キューの次へ進める
 audioPlayer.addEventListener("ended", () => {
   console.log(
@@ -227,6 +247,11 @@ function cleanupPage() {
     isClickAttached = false;
   }
   removeStyles();
+  // 再生キューのリセット
+  playbackQueue = [];
+  queueIndex = 0;
+  // audioCacheはクリアせず残す（一時停止用）
+  retryCount = 0;
 }
 
 // ハイライトを更新する関数
