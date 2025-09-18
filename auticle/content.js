@@ -1,38 +1,33 @@
 // content.js
+let isClickAttached = false;
+let isEnabled = false;
 
-// --- グローバル変数 ---
-let isListenerAdded = false;
-
-// --- メインロジック ---
-
-// ★★★★★ 新しいメインロジック ★★★★★
 // ストレージの変更を監視するリスナー
-chrome.storage.onChanged.addListener((changes, namespace) => {
-  // 'enabled' の値が変更された場合のみ反応
-  if (changes.enabled) {
-    const isEnabled = changes.enabled.newValue;
-    console.log("Auticle state changed via storage:", isEnabled);
-    if (isEnabled) {
-      preparePage();
-    } else {
-      cleanupPage();
-    }
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.enabled !== undefined) {
+    isEnabled = !!changes.enabled.newValue;
+    console.log("Storage changed: Auticle is now", isEnabled ? "ON" : "OFF");
+    updatePageState(isEnabled);
   }
 });
 
-// ページ読み込み時に、保存された状態で初期化する
+// ページ読み込み時に一度だけ、現在の状態で初期化
 chrome.storage.local.get(["enabled"], (result) => {
-  console.log("Auticle initial state loaded:", result.enabled);
-  if (result.enabled) {
-    preparePage();
-  }
+  isEnabled = !!result.enabled;
+  console.log("Initial state: Auticle is", isEnabled ? "ON" : "OFF");
+  updatePageState(isEnabled);
 });
 
-// --- DOM操作関数 ---
-function preparePage() {
-  if (isListenerAdded) return;
+// ページのON/OFF状態を更新するメイン関数
+function updatePageState(enabled) {
+  if (enabled) {
+    preparePage();
+  } else {
+    cleanupPage();
+  }
+}
 
-  injectStyles("styles.css");
+function preparePage() {
   const selectors = "article p, main p, .post-body p, .entry-content p";
   const paragraphs = document.querySelectorAll(selectors);
   paragraphs.forEach((p, index) => {
@@ -40,8 +35,11 @@ function preparePage() {
     p.classList.add("auticle-clickable");
   });
 
-  document.addEventListener("click", handleClick);
-  isListenerAdded = true;
+  if (!isClickAttached) {
+    document.addEventListener("click", handleClick, true);
+    isClickAttached = true;
+  }
+  injectStyles("styles.css");
 }
 
 function cleanupPage() {
@@ -52,16 +50,24 @@ function cleanupPage() {
     delete p.dataset.auticleId;
   });
 
+  if (isClickAttached) {
+    document.removeEventListener("click", handleClick, true);
+    isClickAttached = false;
+  }
   removeStyles();
-  document.removeEventListener("click", handleClick);
-  isListenerAdded = false;
 }
 
-// --- イベントハンドラとヘルパー関数 ---
 function handleClick(event) {
-  // ... (この関数は変更なし) ...
   const target = event.target.closest(".auticle-clickable");
   if (!target) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  console.log(
+    "Clicked on paragraph:",
+    target.textContent.substring(0, 50) + "..."
+  );
 
   const startId = parseInt(target.dataset.auticleId, 10);
   const allParagraphs = document.querySelectorAll(".auticle-clickable");
@@ -74,19 +80,19 @@ function handleClick(event) {
     }
   });
 
-  if (textToPlay.trim() !== "") {
+  if (textToPlay.trim()) {
     speak(textToPlay);
   }
 }
 
 function speak(text) {
-  // ... (この関数は変更なし) ...
+  console.log("Attempting to speak...");
   if (speechSynthesis.speaking) {
     speechSynthesis.cancel();
     setTimeout(() => {
       const utterance = new SpeechSynthesisUtterance(text);
       speechSynthesis.speak(utterance);
-    }, 100);
+    }, 150); // 少し長めに待つ
   } else {
     const utterance = new SpeechSynthesisUtterance(text);
     speechSynthesis.speak(utterance);
@@ -94,7 +100,6 @@ function speak(text) {
 }
 
 function injectStyles(filePath) {
-  // ... (この関数は変更なし) ...
   if (document.getElementById("auticle-styles")) return;
   const link = document.createElement("link");
   link.id = "auticle-styles";
@@ -105,7 +110,6 @@ function injectStyles(filePath) {
 }
 
 function removeStyles() {
-  // ... (この関数は変更なし) ...
   const link = document.getElementById("auticle-styles");
   if (link) {
     link.remove();
