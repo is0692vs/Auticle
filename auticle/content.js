@@ -6,6 +6,10 @@ let isEnabled = false;
 // 再生キュー（{text, paragraphId} の配列）と現在のキュー位置
 let playbackQueue = [];
 let queueIndex = 0;
+// prefetch cache: queueIndex -> audioDataUrl
+let audioCache = new Map();
+// 先読みするチャンク数
+const PREFETCH_AHEAD = 2;
 
 // background.jsからの再生命令を待つ
 chrome.runtime.onMessage.addListener((message) => {
@@ -134,8 +138,48 @@ function playQueue() {
   // 現在の段落をハイライト
   updateHighlight(item.paragraphId);
 
-  // background.js に再生依頼を送る
-  chrome.runtime.sendMessage({ command: "play", text: item.text });
+  // まずキャッシュをチェック。あれば即座に再生、なければ通常の play 要求を送る
+  const cached = audioCache.get(queueIndex);
+  if (cached) {
+    // 既に取得済みの dataUrl をセットして再生
+    audioPlayer.addEventListener(
+      "canplay",
+      () => {
+        audioPlayer.playbackRate = 2.0;
+        audioPlayer.play();
+      },
+      { once: true }
+    );
+    audioPlayer.src = cached;
+  } else {
+    // 通常の再生要求
+    chrome.runtime.sendMessage({ command: "play", text: item.text });
+  }
+
+  // 次の N 個を非同期でプリフェッチ
+  prefetchNext(queueIndex + 1);
+}
+
+// 指定された startIndex 以降で PREFETCH_AHEAD 個を先読みして audioCache に格納
+function prefetchNext(startIndex) {
+  for (
+    let i = startIndex;
+    i < Math.min(playbackQueue.length, startIndex + PREFETCH_AHEAD);
+    i++
+  ) {
+    if (audioCache.has(i)) continue;
+    const item = playbackQueue[i];
+    if (!item || !item.text) continue;
+    // background に fetch 要求を送り、sendResponse で audioDataUrl を受け取る
+    chrome.runtime.sendMessage(
+      { command: "fetch", text: item.text },
+      (response) => {
+        if (response && response.audioDataUrl) {
+          audioCache.set(i, response.audioDataUrl);
+        }
+      }
+    );
+  }
 }
 
 // 指定した段落IDをハイライト。null なら解除。
