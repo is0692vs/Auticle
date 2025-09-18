@@ -1,83 +1,111 @@
-console.log("Content script placeholder.");
+// content.js
 
-if (!window.auticleListenerAdded) {
-  chrome.runtime.onMessage.addListener(function (
-    message,
-    sender,
-    sendResponse
-  ) {
-    if (message.command === "stateChange") {
-      console.log("Auticle state changed to:", message.enabled);
-      if (message.enabled) {
-        preparePage();
-      } else {
-        cleanupPage();
-      }
+// --- グローバル変数 ---
+let isListenerAdded = false;
+
+// --- メインロジック ---
+
+// ★★★★★ 新しいメインロジック ★★★★★
+// ストレージの変更を監視するリスナー
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  // 'enabled' の値が変更された場合のみ反応
+  if (changes.enabled) {
+    const isEnabled = changes.enabled.newValue;
+    console.log("Auticle state changed via storage:", isEnabled);
+    if (isEnabled) {
+      preparePage();
+    } else {
+      cleanupPage();
     }
-  });
-  window.auticleListenerAdded = true;
-}
-
-function preparePage() {
-  // Guard clause: if already prepared, skip
-  if (document.querySelector(".auticle-clickable")) {
-    return;
   }
+});
 
-  // Select paragraph elements in article or main
-  const selectors = "article p, main p, .post-body p";
+// ページ読み込み時に、保存された状態で初期化する
+chrome.storage.local.get(["enabled"], (result) => {
+  console.log("Auticle initial state loaded:", result.enabled);
+  if (result.enabled) {
+    preparePage();
+  }
+});
+
+// --- DOM操作関数 ---
+function preparePage() {
+  if (isListenerAdded) return;
+
+  injectStyles("styles.css");
+  const selectors = "article p, main p, .post-body p, .entry-content p";
   const paragraphs = document.querySelectorAll(selectors);
-  console.log("Paragraphs found:", paragraphs.length);
-  paragraphs.forEach((element, index) => {
-    element.dataset.auticleId = index;
-    element.classList.add("auticle-clickable");
+  paragraphs.forEach((p, index) => {
+    p.dataset.auticleId = index;
+    p.classList.add("auticle-clickable");
   });
 
-  // Inject styles
-  injectStyles();
-
-  // Add click event listener for triggering playback
   document.addEventListener("click", handleClick);
+  isListenerAdded = true;
 }
 
 function cleanupPage() {
-  // Remove classes and data attributes
-  const clickableElements = document.querySelectorAll(".auticle-clickable");
-  clickableElements.forEach((element) => {
-    element.classList.remove("auticle-clickable");
-    delete element.dataset.auticleId;
+  speechSynthesis.cancel();
+  const paragraphs = document.querySelectorAll(".auticle-clickable");
+  paragraphs.forEach((p) => {
+    p.classList.remove("auticle-clickable");
+    delete p.dataset.auticleId;
   });
 
-  // Remove injected styles
   removeStyles();
-
-  // Remove click event listener
   document.removeEventListener("click", handleClick);
+  isListenerAdded = false;
 }
 
+// --- イベントハンドラとヘルパー関数 ---
 function handleClick(event) {
+  // ... (この関数は変更なし) ...
   const target = event.target.closest(".auticle-clickable");
-  if (target) {
-    const id = parseInt(target.dataset.auticleId);
-    const paragraphs = document.querySelectorAll(".auticle-clickable");
-    let text = "";
-    for (let i = id; i < paragraphs.length; i++) {
-      text += paragraphs[i].textContent + "\n\n";
+  if (!target) return;
+
+  const startId = parseInt(target.dataset.auticleId, 10);
+  const allParagraphs = document.querySelectorAll(".auticle-clickable");
+  let textToPlay = "";
+
+  allParagraphs.forEach((p) => {
+    const currentId = parseInt(p.dataset.auticleId, 10);
+    if (currentId >= startId) {
+      textToPlay += p.textContent + "\n\n";
     }
-    console.log("Sending text:", text);
-    chrome.runtime.sendMessage({ command: "play", text: text });
+  });
+
+  if (textToPlay.trim() !== "") {
+    speak(textToPlay);
   }
 }
 
-function injectStyles() {
+function speak(text) {
+  // ... (この関数は変更なし) ...
+  if (speechSynthesis.speaking) {
+    speechSynthesis.cancel();
+    setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      speechSynthesis.speak(utterance);
+    }, 100);
+  } else {
+    const utterance = new SpeechSynthesisUtterance(text);
+    speechSynthesis.speak(utterance);
+  }
+}
+
+function injectStyles(filePath) {
+  // ... (この関数は変更なし) ...
+  if (document.getElementById("auticle-styles")) return;
   const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = chrome.runtime.getURL("styles.css");
   link.id = "auticle-styles";
+  link.rel = "stylesheet";
+  link.type = "text/css";
+  link.href = chrome.runtime.getURL(filePath);
   document.head.appendChild(link);
 }
 
 function removeStyles() {
+  // ... (この関数は変更なし) ...
   const link = document.getElementById("auticle-styles");
   if (link) {
     link.remove();
