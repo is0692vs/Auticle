@@ -210,8 +210,8 @@ function preparePage() {
             tagName === "blockquote" ||
             tagName === "pre")
         ) {
-          el.dataset.auticleId = paragraphId;
-          el.classList.add("auticle-clickable");
+          el.dataset.audicleId = paragraphId;
+          el.classList.add("audicle-clickable");
           paragraphId++;
         }
       });
@@ -221,8 +221,8 @@ function preparePage() {
     const selectors = "article p, main p, .post-body p, .entry-content p";
     const paragraphs = document.querySelectorAll(selectors);
     paragraphs.forEach((p, index) => {
-      p.dataset.auticleId = index;
-      p.classList.add("auticle-clickable");
+      p.dataset.audicleId = index;
+      p.classList.add("audicle-clickable");
     });
   }
   if (!isClickAttached) {
@@ -237,10 +237,10 @@ function preparePage() {
 function cleanupPage() {
   audioPlayer.pause();
   isPlaying = false;
-  const paragraphs = document.querySelectorAll(".auticle-clickable");
+  const paragraphs = document.querySelectorAll(".audicle-clickable");
   paragraphs.forEach((p) => {
-    p.classList.remove("auticle-clickable");
-    delete p.dataset.auticleId;
+    p.classList.remove("audicle-clickable");
+    delete p.dataset.audicleId;
   });
   if (isClickAttached) {
     document.removeEventListener("click", handleClick, true);
@@ -257,23 +257,23 @@ function cleanupPage() {
 // ハイライトを更新する関数
 function updateHighlight(paragraphId) {
   // 既存のハイライトを解除
-  const currentHighlight = document.querySelector(".auticle-highlight");
+  const currentHighlight = document.querySelector(".audicle-highlight");
   if (currentHighlight) {
-    currentHighlight.classList.remove("auticle-highlight");
+    currentHighlight.classList.remove("audicle-highlight");
   }
   // 新しいハイライトを設定
   if (paragraphId !== null) {
     const element = document.querySelector(
-      `[data-auticle-id="${paragraphId}"]`
+      `[data-audicle-id="${paragraphId}"]`
     );
     if (element) {
-      element.classList.add("auticle-highlight");
+      element.classList.add("audicle-highlight");
     }
   }
 }
 
 function handleClick(event) {
-  const target = event.target.closest(".auticle-clickable");
+  const target = event.target.closest(".audicle-clickable");
   if (!target) return;
   event.preventDefault();
   event.stopPropagation();
@@ -282,14 +282,14 @@ function handleClick(event) {
     "handleClick: Clicked element:",
     target,
     "ID:",
-    target.dataset.auticleId,
+    target.dataset.audicleId,
     "isPlaying:",
     isPlaying
   );
 
   // 再生中の場合、位置変更のみ
   if (isPlaying && playbackQueue.length > 0) {
-    const clickedId = parseInt(target.dataset.auticleId);
+    const clickedId = parseInt(target.dataset.audicleId);
     if (!isNaN(clickedId)) {
       const startIndex = playbackQueue.findIndex(
         (item) => item.paragraphId === clickedId
@@ -336,7 +336,7 @@ function handleClick(event) {
 
   if (queue.length > 0) {
     playbackQueue = queue;
-    const clickedId = parseInt(target.dataset.auticleId);
+    const clickedId = parseInt(target.dataset.audicleId);
     if (!isNaN(clickedId)) {
       const startIndex = queue.findIndex(
         (item) => item.paragraphId === clickedId
@@ -401,8 +401,8 @@ function buildQueueWithCustomRule(rule) {
         tagName === "blockquote" ||
         tagName === "pre")
     ) {
-      el.dataset.auticleId = paragraphId;
-      el.classList.add("auticle-clickable");
+      el.dataset.audicleId = paragraphId;
+      el.classList.add("audicle-clickable");
       console.log(
         "buildQueueWithCustomRule: Added element",
         tagName,
@@ -474,7 +474,7 @@ function buildQueueWithFallback() {
   paragraphs.forEach((p) => {
     const text = (p.textContent || "").trim();
     if (text) {
-      const paragraphId = parseInt(p.dataset.auticleId);
+      const paragraphId = parseInt(p.dataset.audicleId);
       // 200文字ごとに分割
       const chunkSize = 200;
       for (let i = 0; i < text.length; i += chunkSize) {
@@ -696,9 +696,9 @@ function fullBatchFetch(callback) {
 }
 
 function injectStyles(filePath) {
-  if (document.getElementById("auticle-styles")) return;
+  if (document.getElementById("audicle-styles")) return;
   const link = document.createElement("link");
-  link.id = "auticle-styles";
+  link.id = "audicle-styles";
   link.rel = "stylesheet";
   link.type = "text/css";
   link.href = chrome.runtime.getURL(filePath);
@@ -706,7 +706,7 @@ function injectStyles(filePath) {
 }
 
 function removeStyles() {
-  const link = document.getElementById("auticle-styles");
+  const link = document.getElementById("audicle-styles");
   if (link) {
     link.remove();
   }

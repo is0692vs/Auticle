@@ -1,12 +1,12 @@
-/* Auticle Styles */
-.auticle-clickable {
+/* Audicle Styles */
+.audicle-clickable {
   cursor: pointer;
 }
 
-.auticle-clickable:hover {
+.audicle-clickable:hover {
   background-color: #f0f8ff;
 }
 
-.auticle-highlight {
+.audicle-highlight {
   background-color: #ffffbe;
 }
