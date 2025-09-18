@@ -1,7 +1,21 @@
 // background.js
+// テキストをクリーンアップする関数
+function cleanText(text) {
+  // URLを除去
+  text = text.replace(/https?:\/\/[^\s]+/g, "");
+  // 特殊文字を除去（句読点以外）
+  text = text.replace(
+    /[^\w\s\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/g,
+    ""
+  );
+  // 連続する空白を1つに
+  text = text.replace(/\s+/g, " ").trim();
+  return text;
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.command === "play") {
-    const text = message.text;
+    const text = cleanText(message.text);
     const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(
       text
     )}&tl=ja`;
@@ -27,7 +41,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // prefetch 用に audioDataUrl を返すエンドポイント
   if (message.command === "fetch") {
-    const text = message.text;
+    const text = cleanText(message.text);
     const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(
       text
     )}&tl=ja`;

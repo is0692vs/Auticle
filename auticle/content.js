@@ -14,6 +14,10 @@ let audioCache = new Map();
 // 先読みするチャンク数
 const PREFETCH_AHEAD = 2;
 
+// リトライカウンター
+let retryCount = 0;
+const MAX_RETRIES = 2;
+
 // ----- Readability 注入 & カスタムルール定義 -----
 // ドメインごとの独自抽出ルール（まずは qiita.com のプレースホルダ）
 const customRules = {
@@ -92,6 +96,7 @@ audioPlayer.addEventListener("ended", () => {
     "queue length:",
     playbackQueue.length
   );
+  retryCount = 0; // リトライカウンターをリセット
   queueIndex += 1;
   if (queueIndex < playbackQueue.length) {
     console.log("Moving to next item, new queueIndex:", queueIndex);
@@ -109,15 +114,24 @@ audioPlayer.addEventListener("ended", () => {
 // audio のエラーを処理
 audioPlayer.addEventListener("error", (e) => {
   console.error("Audio error:", e);
-  isPlaying = false;
-  // エラー時は次のアイテムに進む
-  queueIndex += 1;
-  if (queueIndex < playbackQueue.length) {
-    playQueue();
+  if (retryCount < MAX_RETRIES) {
+    retryCount++;
+    console.log(
+      `Retrying playback for index ${queueIndex}, attempt ${retryCount}`
+    );
+    setTimeout(() => playQueue(), 3000); // 3秒遅延してリトライ
   } else {
-    updateHighlight(null);
-    playbackQueue = [];
-    queueIndex = 0;
+    console.log(`Max retries reached for index ${queueIndex}, skipping`);
+    retryCount = 0;
+    isPlaying = false;
+    queueIndex += 1;
+    if (queueIndex < playbackQueue.length) {
+      playQueue();
+    } else {
+      updateHighlight(null);
+      playbackQueue = [];
+      queueIndex = 0;
+    }
   }
 });
 
@@ -449,8 +463,12 @@ function playQueue() {
     "text length:",
     item.text.length,
     "paragraphId:",
-    item.paragraphId
+    item.paragraphId,
+    "text:",
+    item.text
   );
+
+  // リトライカウンターはリセットしない（リトライ時は維持）
 
   // 現在の段落をハイライト
   updateHighlight(item.paragraphId);
@@ -491,14 +509,16 @@ function prefetchNext(startIndex) {
     const item = playbackQueue[i];
     if (!item || !item.text) continue;
     // background に fetch 要求を送り、sendResponse で audioDataUrl を受け取る
-    chrome.runtime.sendMessage(
-      { command: "fetch", text: item.text },
-      (response) => {
-        if (response && response.audioDataUrl) {
-          audioCache.set(i, response.audioDataUrl);
+    setTimeout(() => {
+      chrome.runtime.sendMessage(
+        { command: "fetch", text: item.text },
+        (response) => {
+          if (response && response.audioDataUrl) {
+            audioCache.set(i, response.audioDataUrl);
+          }
         }
-      }
-    );
+      );
+    }, (i - startIndex) * 1000); // 各リクエストに1秒間隔
   }
 }
 
