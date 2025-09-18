@@ -25,7 +25,8 @@ function preparePage() {
   }
 
   // Select paragraph elements in article or main
-  const paragraphs = document.querySelectorAll("article p, main p");
+  const selectors = "article p, main p, .post-body p";
+  const paragraphs = document.querySelectorAll(selectors);
   paragraphs.forEach((element, index) => {
     element.dataset.auticleId = index;
     element.classList.add("auticle-clickable");
@@ -33,6 +34,9 @@ function preparePage() {
 
   // Inject styles
   injectStyles();
+
+  // Add click event listener for triggering playback
+  document.addEventListener("click", handleClick);
 }
 
 function cleanupPage() {
@@ -45,6 +49,22 @@ function cleanupPage() {
 
   // Remove injected styles
   removeStyles();
+
+  // Remove click event listener
+  document.removeEventListener("click", handleClick);
+}
+
+function handleClick(event) {
+  const target = event.target.closest(".auticle-clickable");
+  if (target) {
+    const id = parseInt(target.dataset.auticleId);
+    const paragraphs = document.querySelectorAll(".auticle-clickable");
+    let text = "";
+    for (let i = id; i < paragraphs.length; i++) {
+      text += paragraphs[i].textContent + "\n\n";
+    }
+    chrome.runtime.sendMessage({ command: "play", text: text });
+  }
 }
 
 function injectStyles() {
