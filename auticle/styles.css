@@ -1,0 +1,12 @@
+/* Auticle Styles */
+.auticle-clickable {
+  cursor: pointer;
+}
+
+.auticle-clickable:hover {
+  background-color: #f0f8ff;
+}
+
+.auticle-highlight {
+  background-color: #ffffbe;
+}
