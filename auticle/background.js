@@ -6,22 +6,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       text
     )}&tl=ja`;
 
-    // fetchを使って音声データを取得
     fetch(ttsUrl)
       .then((response) => response.blob())
       .then((blob) => {
-        // BlobをData URLに変換
         const reader = new FileReader();
         reader.onload = (e) => {
-          // content.jsに再生命令を送り返す
-          chrome.tabs.sendMessage(sender.tab.id, {
-            command: "playAudio",
-            audioDataUrl: e.target.result,
-          });
+          if (sender.tab?.id) {
+            chrome.tabs.sendMessage(sender.tab.id, {
+              command: "playAudio",
+              audioDataUrl: e.target.result,
+            });
+          }
         };
         reader.readAsDataURL(blob);
       })
       .catch((error) => console.error("TTS Fetch Error:", error));
+
+    return true; // 非同期で応答を返すためtrueを返す
   }
-  return true; // 非同期応答のためにtrueを返す
 });

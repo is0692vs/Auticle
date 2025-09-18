@@ -15,15 +15,6 @@
         justify-content: space-between;
         align-items: center;
       }
-      .slider-group {
-        display: flex;
-        flex-direction: column;
-      }
-      #speed-value {
-        align-self: flex-end;
-        font-size: 0.9em;
-        color: #555;
-      }
     </style>
   </head>
   <body>
@@ -34,19 +25,6 @@
         <input type="checkbox" id="toggle-switch" />
         <span class="slider round"></span>
       </label>
-    </div>
-
-    <div class="slider-group">
-      <label for="speed-slider">再生速度</label>
-      <input
-        type="range"
-        id="speed-slider"
-        min="0.5"
-        max="2.5"
-        step="0.1"
-        value="1"
-      />
-      <span id="speed-value">1.0x</span>
     </div>
     <script src="popup.js"></script>
   </body>

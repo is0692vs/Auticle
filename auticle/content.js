@@ -3,27 +3,26 @@ let audioPlayer = new Audio();
 let isClickAttached = false;
 let isEnabled = false;
 
-// --- メッセージリスナー ---
-// background.js(音声データ)とpopup.js(速度変更)からの命令を待つ
+// background.jsからの再生命令を待つ
 chrome.runtime.onMessage.addListener((message) => {
   if (message.command === "playAudio") {
+    // ★★★ これが最終的な修正です ★★★
+
+    // プレーヤーが「再生準備完了(canplay)」になったら一度だけ実行するリスナーを登録
+    audioPlayer.addEventListener(
+      "canplay",
+      () => {
+        // 準備が完了したこのタイミングで速度を設定し、再生を開始する
+        audioPlayer.playbackRate = 2.0;
+        audioPlayer.play();
+      },
+      { once: true }
+    ); // { once: true } でイベントが一度だけ実行されるようにする
+
+    // リスナーを登録してから、音源ソースを設定する
     audioPlayer.src = message.audioDataUrl;
-    audioPlayer.play();
-  } else if (message.command === "changeSpeed") {
-    audioPlayer.playbackRate = message.speed;
+    // ★★★★★★★★★★★★★★★★★★★★★
   }
-});
-
-// --- 初期化処理 ---
-// 起動時に保存された速度をオーディオプレーヤーに適用
-chrome.storage.local.get(["speed"], (result) => {
-  audioPlayer.playbackRate = result.speed || 1.0;
-});
-
-// 起動時に保存された有効/無効状態でページを初期化
-chrome.storage.local.get(["enabled"], (result) => {
-  isEnabled = !!result.enabled;
-  updatePageState(isEnabled);
 });
 
 // ストレージの変更（主に有効/無効の変更）を監視
@@ -34,7 +33,13 @@ chrome.storage.onChanged.addListener((changes) => {
   }
 });
 
-// --- 関数の定義 ---
+// ページ読み込み時に一度だけ、現在の状態で初期化
+chrome.storage.local.get(["enabled"], (result) => {
+  isEnabled = !!result.enabled;
+  updatePageState(isEnabled);
+});
+
+// ページのON/OFF状態を更新するメイン関数
 function updatePageState(enabled) {
   if (enabled) {
     preparePage();
@@ -71,7 +76,6 @@ function cleanupPage() {
   removeStyles();
 }
 
-// ▼▼▼ 消えていた関数をここに追加 ▼▼▼
 function handleClick(event) {
   const target = event.target.closest(".auticle-clickable");
   if (!target) return;
@@ -88,18 +92,10 @@ function handleClick(event) {
   });
 
   if (textToPlay.trim()) {
-    // テキストが長すぎるとGoogleが拒否するため、最初の約200文字に制限
     const shortText = textToPlay.substring(0, 200);
-    // 再生依頼をbackground.jsに送信
     chrome.runtime.sendMessage({ command: "play", text: shortText });
   }
 }
-
-function speakWithGoogleTTS(text) {
-  // この関数はbackground.jsに移動したため、content.jsでは不要です
-  // ただし、handleClickは必要です
-}
-// ▲▲▲ ここまで ▲▲▲
 
 function injectStyles(filePath) {
   if (document.getElementById("auticle-styles")) return;
