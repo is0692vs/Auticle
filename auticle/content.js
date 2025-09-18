@@ -27,6 +27,7 @@ function preparePage() {
   // Select paragraph elements in article or main
   const selectors = "article p, main p, .post-body p";
   const paragraphs = document.querySelectorAll(selectors);
+  console.log("Paragraphs found:", paragraphs.length);
   paragraphs.forEach((element, index) => {
     element.dataset.auticleId = index;
     element.classList.add("auticle-clickable");
@@ -63,6 +64,7 @@ function handleClick(event) {
     for (let i = id; i < paragraphs.length; i++) {
       text += paragraphs[i].textContent + "\n\n";
     }
+    console.log("Sending text:", text);
     chrome.runtime.sendMessage({ command: "play", text: text });
   }
 }

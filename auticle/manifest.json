@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "A browser extension to read articles aloud.",
   "manifest_version": 3,
-  "permissions": ["storage", "activeTab", "scripting"],
+  "permissions": ["storage", "activeTab", "scripting", "offscreen"],
   "background": { "service_worker": "background.js" },
   "action": {
     "default_popup": "popup.html",
