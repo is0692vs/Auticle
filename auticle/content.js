@@ -72,8 +72,6 @@ function injectReadabilityLib() {
 chrome.runtime.onMessage.addListener((message) => {
   if (message.command === "playAudio") {
     isPlaying = true;
-    // ★★★ これが最終的な修正です ★★★
-
     // プレーヤーが「再生準備完了(canplay)」になったら一度だけ実行するリスナーを登録
     audioPlayer.addEventListener(
       "canplay",
@@ -87,7 +85,12 @@ chrome.runtime.onMessage.addListener((message) => {
 
     // リスナーを登録してから、音源ソースを設定する
     audioPlayer.src = message.audioDataUrl;
-    // ★★★★★★★★★★★★★★★★★★★★★
+  }
+
+  // 音声合成エラー処理
+  if (message.command === "audioError") {
+    console.error("音声合成エラー:", message.error);
+    isPlaying = false;
   }
 });
 

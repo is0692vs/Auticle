@@ -1,4 +1,95 @@
 // background.js
+
+// 音声合成の統一インターフェース
+class AudioSynthesizer {
+  constructor() {}
+
+  /**
+   * テキストを音声に変換してaudioDataUrlを返す
+   * @param {string} text - 変換するテキスト
+   * @returns {Promise<string>} - audioDataUrl (data:audio/mpeg;base64,...)
+   */
+  async synthesize(text) {
+    throw new Error("synthesize method must be implemented");
+  }
+}
+
+// Google翻訳TTS実装
+class GoogleTTSSynthesizer extends AudioSynthesizer {
+  constructor() {
+    super();
+  }
+
+  async synthesize(text) {
+    const cleanedText = cleanText(text);
+    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(
+      cleanedText
+    )}&tl=ja`;
+
+    const response = await fetch(ttsUrl);
+    const blob = await response.blob();
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.readAsDataURL(blob);
+    });
+  }
+}
+
+// テスト用TTS実装（常にsample.mp3を返す）
+class TestSynthesizer extends AudioSynthesizer {
+  constructor() {
+    super();
+  }
+
+  async synthesize(text) {
+    console.log(
+      `[TestSynthesizer] Request for text: "${text}" - returning sample.mp3`
+    );
+
+    const sampleUrl = chrome.runtime.getURL("sample.mp3");
+    const response = await fetch(sampleUrl);
+    const blob = await response.blob();
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.readAsDataURL(blob);
+    });
+  }
+}
+
+// 音声合成ファクトリー
+class SynthesizerFactory {
+  static create(type) {
+    switch (type) {
+      case "google_tts":
+        return new GoogleTTSSynthesizer();
+      case "test":
+        return new TestSynthesizer();
+      default:
+        throw new Error(`Unknown synthesizer type: ${type}`);
+    }
+  }
+}
+
+// 設定管理
+let config = null;
+
+async function loadConfig() {
+  if (config) return config;
+
+  try {
+    const response = await fetch(chrome.runtime.getURL("config.json"));
+    config = await response.json();
+  } catch (error) {
+    console.warn("Config file not found, using default settings");
+    config = { synthesizerType: "google_tts" };
+  }
+  return config;
+}
+
 // テキストをクリーンアップする関数
 function cleanText(text) {
   // URLを除去
@@ -15,80 +106,63 @@ function cleanText(text) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.command === "play") {
-    const text = cleanText(message.text);
-    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(
-      text
-    )}&tl=ja`;
+    loadConfig().then(async (config) => {
+      try {
+        const synthesizer = SynthesizerFactory.create(config.synthesizerType);
+        const audioDataUrl = await synthesizer.synthesize(message.text);
 
-    fetch(ttsUrl)
-      .then((response) => response.blob())
-      .then((blob) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          if (sender.tab?.id) {
-            chrome.tabs.sendMessage(sender.tab.id, {
-              command: "playAudio",
-              audioDataUrl: e.target.result,
-            });
-          }
-        };
-        reader.readAsDataURL(blob);
-      })
-      .catch((error) => console.error("TTS Fetch Error:", error));
+        if (sender.tab?.id) {
+          chrome.tabs.sendMessage(sender.tab.id, {
+            command: "playAudio",
+            audioDataUrl: audioDataUrl,
+          });
+        }
+      } catch (error) {
+        console.error("Speech synthesis error:", error);
+        if (sender.tab?.id) {
+          chrome.tabs.sendMessage(sender.tab.id, {
+            command: "audioError",
+            error: error.message,
+          });
+        }
+      }
+    });
 
     return true; // 非同期で応答を返すためtrueを返す
   }
 
   // prefetch 用に audioDataUrl を返すエンドポイント
   if (message.command === "fetch") {
-    const text = cleanText(message.text);
-    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(
-      text
-    )}&tl=ja`;
-
-    fetch(ttsUrl)
-      .then((response) => response.blob())
-      .then((blob) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          // 呼び出し元に audioDataUrl を返す
-          sendResponse({ audioDataUrl: e.target.result });
-        };
-        reader.readAsDataURL(blob);
-      })
-      .catch((error) => {
-        console.error("TTS Fetch Error:", error);
-        sendResponse({ error: String(error) });
-      });
+    loadConfig().then(async (config) => {
+      try {
+        const synthesizer = SynthesizerFactory.create(config.synthesizerType);
+        const audioDataUrl = await synthesizer.synthesize(message.text);
+        sendResponse({ audioDataUrl: audioDataUrl });
+      } catch (error) {
+        console.error("Speech synthesis error (fetch):", error);
+        sendResponse({ error: error.message });
+      }
+    });
 
     return true; // 非同期で sendResponse を使うため true を返す
   }
 
   // バッチフェッチ
   if (message.command === "batchFetch") {
-    const promises = message.batch.map(({ index, text }) => {
-      const cleanedText = cleanText(text);
-      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(
-        cleanedText
-      )}&tl=ja`;
+    loadConfig().then(async (config) => {
+      const synthesizer = SynthesizerFactory.create(config.synthesizerType);
 
-      return fetch(ttsUrl)
-        .then((response) => response.blob())
-        .then((blob) => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () =>
-              resolve({ index, audioDataUrl: reader.result });
-            reader.readAsDataURL(blob);
-          });
-        })
-        .catch((error) => {
-          console.error("TTS Batch Fetch Error for index", index, ":", error);
-          return { index, error: String(error) };
-        });
-    });
+      const promises = message.batch.map(async ({ index, text }) => {
+        try {
+          const audioDataUrl = await synthesizer.synthesize(text);
+          return { index, audioDataUrl };
+        } catch (error) {
+          console.error("Speech synthesis error for index", index, ":", error);
+          return { index, error: error.message };
+        }
+      });
 
-    Promise.all(promises).then((results) => {
+      const results = await Promise.all(promises);
       const audioDataUrls = results.filter((r) => r.audioDataUrl);
       sendResponse({ audioDataUrls });
     });
@@ -98,34 +172,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // 全キュー一括フェッチ
   if (message.command === "fullBatchFetch") {
-    const promises = message.batch.map(({ index, text }) => {
-      const cleanedText = cleanText(text);
-      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=${encodeURIComponent(
-        cleanedText
-      )}&tl=ja`;
+    loadConfig().then(async (config) => {
+      const synthesizer = SynthesizerFactory.create(config.synthesizerType);
 
-      return fetch(ttsUrl)
-        .then((response) => response.blob())
-        .then((blob) => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () =>
-              resolve({ index, audioDataUrl: reader.result });
-            reader.readAsDataURL(blob);
-          });
-        })
-        .catch((error) => {
-          console.error(
-            "TTS Full Batch Fetch Error for index",
-            index,
-            ":",
-            error
-          );
-          return { index, error: String(error) };
-        });
-    });
+      const promises = message.batch.map(async ({ index, text }) => {
+        try {
+          const audioDataUrl = await synthesizer.synthesize(text);
+          return { index, audioDataUrl };
+        } catch (error) {
+          console.error("Speech synthesis error for index", index, ":", error);
+          return { index, error: error.message };
+        }
+      });
 
-    Promise.all(promises).then((results) => {
+      const results = await Promise.all(promises);
       const audioDataUrls = results.filter((r) => r.audioDataUrl);
       sendResponse({ audioDataUrls });
     });

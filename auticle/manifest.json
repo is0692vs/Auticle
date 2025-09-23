@@ -24,7 +24,12 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["styles.css", "lib/Readability.js"],
+      "resources": [
+        "styles.css",
+        "lib/Readability.js",
+        "config.json",
+        "sample.mp3"
+      ],
       "matches": ["<all_urls>"]
     }
   ]
