@@ -5,7 +5,47 @@ Audicle（Article + Audio）は、ウェブページ上の記事コンテンツ�
 ```text
 auticle/
 ├── background.js         # 音声データ取得・音声合成モジュール
-├── content.js            # ページ操作、再生キュー、ハイライト管理
+├── content.js     ### 6. デバッグのヒント
+
+- **Console ログ確認**: `[🎯 Extraction Result]` でどのルールが採用されたかを確認
+- **抽出結果の検証**: `getCurrentPageRuleInfo()` をConsoleで実行
+- **複数ルール競合時**: `priority` の値で採用優先度が決定される
+
+## 🧪 テスト方法
+
+### 基本動作テスト
+
+1. **Chrome拡張機能の更新**
+   ```
+   chrome://extensions/ でAudicle拡張機能の「更新」ボタンをクリック
+   ```
+
+2. **テストページでの確認**
+   - `test/test.html` を開いて基本機能をテスト
+   - 段落をクリックして音声再生・ハイライト機能を確認
+
+3. **Qiitaページでの確認** 
+   - 任意のQiita記事を開く
+   - Consoleで以下のログを確認:
+     ```
+     [ExtractionRules] Found site-specific rule: qiita-custom
+     [NewRulesManager] Using rule: qiita-custom (site-specific, priority: 1000)
+     [🎯 Extraction Result] Rule: qiita-custom, Blocks: XX, Domain: qiita.com
+     ```
+
+4. **新ルール管理システムの動作確認**
+   - Consoleで `getCurrentPageRuleInfo()` を実行
+   - 現在のページで採用されるルール情報を確認
+
+### デバッグ用コマンド
+
+```javascript
+// 現在のページのルール情報表示
+getCurrentPageRuleInfo()
+
+// ルール管理システムのデバッグ情報取得（開発者向け）
+new ExtractionRulesManager().getDebugInfo()
+```  # ページ操作、再生キュー、ハイライト管理
 ├── config.json           # 音声合成方式設定
 ├── images/               # アイコン画像
 │   ├── icon16.png
@@ -105,6 +145,64 @@ audicle/
 - **一時停止/再開**: ポップアップの「一時停止」ボタンで再生を止め、「再開」ボタンで続きから再生できます。
 - **再生速度**: 現在は固定でベタ打ちで `audioPlayer.playbackRate` に設定しています．等倍速がかなり遅いため，2.0 倍速にしています．
 - **音声合成方式**: `auticle/config.json` の `synthesizerType` で音声合成エンジンを指定できます（現在は `"google_tts"` のみ対応）。設定変更後は拡張機能のリロードが必要です。
+
+## 🔧 開発者向け - 新サイト対応ルール追加手順
+
+特定のサイトに最適化された抽出ルールを追加する場合の手順：
+
+### 1. ルール定義ファイルの編集
+
+`audicle/content-extract/rules.js` の `SITE_SPECIFIC_RULES` に新しいルールを追加：
+
+```javascript
+const SITE_SPECIFIC_RULES = {
+  // 既存のルール...
+
+  "example.com": {
+    id: "example-custom",
+    priority: 1000,
+    type: "site-specific",
+    contentSelector: "article p, .content p, main p", // サイト固有のセレクター
+    description: "example.com用カスタム抽出ルール",
+  },
+};
+```
+
+### 2. セレクターの特定方法
+
+1. **対象サイトを Chrome で開く**
+2. **Developer Tools (F12) で要素を検査**
+3. **本文部分の CSS セレクターを特定**
+4. **Console で動作確認**:
+   ```javascript
+   // セレクターのテスト
+   document.querySelectorAll("your-selector-here");
+   ```
+
+### 3. 優先度の設定
+
+- `priority: 1000` - サイト固有ルール（最優先）
+- `priority: 500` - 汎用ルール
+- `priority: 100` - フォールバックルール
+
+### 4. ルールの動作確認
+
+1. **拡張機能のリロード**: `chrome://extensions/` で Audicle 拡張機能を更新
+2. **対象サイトでテスト**: ページを開いて Console を確認
+3. **ルール採用状況の確認**: Console に自動表示される `[📋 Current Page Rule]` ログを確認
+
+### 5. よく使用される CSS セレクターのパターン
+
+- **記事サイト**: `article p, .post-content p, .entry-content p`
+- **ブログ**: `main p, .content p, .post-body p`
+- **ニュースサイト**: `.article-body p, .story-content p`
+- **技術サイト**: `.markdown-body p, .article-content p`
+
+### 6. デバッグのヒント
+
+- **Console ログ確認**: `[🎯 Extraction Result]` でどのルールが採用されたかを確認
+- **抽出結果の検証**: `getCurrentPageRuleInfo()` を Console で実行
+- **複数ルール競合時**: `priority` の値で採用優先度が決定される
 
 ## 📝 注意事項
 
