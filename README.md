@@ -1,6 +1,26 @@
 # Audicle
 
-Audicle（Article + Audio）は、ウェブページ上の記事コンテンツを音声で読み上げる Chrome 拡張機能です。クリックした段落から、記事の最後までをインテリジェントに読み上げ、再生箇所をハイライトすることで、快適な「ながら読書」体験を提供します。
+Audicle（Article + Audio）は、ウェブページ上の記事コンテンツを音声で読み上げる ## 📂 ディレクトリ構造
+
+```text
+auticle/
+├── background.js         # 音声データ取得・音声合成モジュール
+├── content.js            # ページ操作、再生キュー、ハイライト管理
+├── config.json           # 音声合成方式設定
+├── images/               # アイコン画像
+│   ├── icon16.png
+│   ├── icon48.png
+│   └── icon128.png
+├── lib/
+│   └── Readability.js    # 本文抽出ライブラリ
+├── manifest.json         # 拡張機能の定義ファイル
+├── popup.css             # ポップアップのスタイル
+├── popup.html            # ポップアップのUI
+├── popup.js              # ポップアップの動作
+└── styles.css            # ページに注入されるハイライト用スタイル
+```
+
+クリックした段落から、記事の最後までをインテリジェントに読み上げ、再生箇所をハイライトすることで、快適な「ながら読書」体験を提供します。
 
 ## ✨ 主な機能
 
@@ -33,9 +53,32 @@ Audicle（Article + Audio）は、ウェブページ上の記事コンテンツ�
   - 再生キューの管理、連続再生、同期ハイライトの全ロジックを担当。
   - `background.js`にテキストを渡し、音声データの取得を依頼します。
 - **`background.js`**: バックグラウンドで動作するサービスワーカー。
-  - `content.js`から受け取ったテキストを元に、Google 翻訳の TTS エンドポイントへ`fetch`リクエストを送信。
-  - 取得した音声データ（MP3）を再生可能な`data: URL`に変換し、`content.js`に返却します。
+  - **疎結合音声合成モジュール**: `AudioSynthesizer`基底クラス・`GoogleTTSSynthesizer`実装・`SynthesizerFactory`ファクトリによる疎結合設計を採用。
+  - `config.json`で指定された音声合成方式（現在は Google TTS）に基づいて、テキストから音声データ URL を生成。
+  - 将来的な音声合成エンジンの追加・変更を容易にするアーキテクチャを実現。
+- **`config.json`**: 使用する音声合成方式を指定する設定ファイル（現在は`{"synthesizerType": "google_tts"}`）。
 - **`lib/Readability.js`**: Mozilla 製の本文抽出ライブラリ。ノイズを除去し、質の高いテキストコンテンツを提供します。
+
+### 音声合成モジュール設計
+
+音声合成ロジックは疎結合モジュールとして分離されており、以下の構造で動作します：
+
+```javascript
+// 統一インターフェース
+class AudioSynthesizer {
+  async synthesize(text) // テキスト → 音声データURL
+}
+
+// Google TTS実装
+class GoogleTTSSynthesizer extends AudioSynthesizer {
+  // Google翻訳TTSエンドポイントを利用
+}
+
+// ファクトリによる方式選択
+SynthesizerFactory.create(config.synthesizerType)
+```
+
+この設計により、将来的に Azure Cognitive Services、Amazon Polly、Web Speech API などの新しい音声合成エンジンを容易に追加できます。
 
 ## 📂 ディレクトリ構造
 
@@ -61,6 +104,7 @@ audicle/
 - **読み上げモード**: ポップアップのトグルスイッチで ON/OFF を切り替えます。OFF にすると、再生が完全に停止し、ハイライトも解除されます。
 - **一時停止/再開**: ポップアップの「一時停止」ボタンで再生を止め、「再開」ボタンで続きから再生できます。
 - **再生速度**: 現在は固定でベタ打ちで `audioPlayer.playbackRate` に設定しています．等倍速がかなり遅いため，2.0 倍速にしています．
+- **音声合成方式**: `auticle/config.json` の `synthesizerType` で音声合成エンジンを指定できます（現在は `"google_tts"` のみ対応）。設定変更後は拡張機能のリロードが必要です。
 
 ## 📝 注意事項
 
