@@ -273,14 +273,16 @@ class ExtractionRulesManager {
       throw new Error("No suitable container found");
     }
 
-    // コンテンツ要素を抽出
-    const elements = [];
+    // コンテンツ要素を抽出（DOM順序を保持）
     const contentSelectors = strategy.contentSelectors || ["p"];
 
-    contentSelectors.forEach((selector) => {
-      const foundElements = container.querySelectorAll(selector);
-      elements.push(...Array.from(foundElements));
-    });
+    // 全てのセレクターを組み合わせて一度にクエリ
+    const combinedSelector = contentSelectors.join(", ");
+    const elements = Array.from(container.querySelectorAll(combinedSelector));
+
+    console.log(
+      `[ExtractionRules] Found ${elements.length} elements with selector: ${combinedSelector}`
+    );
 
     // 結果を処理
     const blocks = [];

@@ -72,6 +72,61 @@ Audicle は疎結合な音声合成モジュール設計を採用しており、
 - 音声形式: MP3
 - レスポンス: 固定
 
+---
+
+### 3. Edge TTS (高品質・最新)
+
+**設定値**: `"edge_tts"`
+
+```json
+{
+  "synthesizerType": "edge_tts"
+}
+```
+
+**特徴**:
+
+- ✅ **最高品質**: Microsoft Edge TTS エンジンによる極めて自然な音声
+- ✅ **多様な音声**: 複数の日本語音声から選択可能
+- ✅ **高速レスポンス**: ローカルサーバーによる高速処理
+- ✅ **カスタマイズ可能**: 話速・音程の細かな調整が可能
+- ✅ **安定性**: 公式 API による安定した動作
+- ⚠️ **サーバー必須**: Python TTS Server の起動が必要
+- ⚠️ **初回設定**: セットアップが必要
+
+**適用場面**:
+
+- 最高品質の音声が必要な場合
+- 長時間の音声読み上げ
+- プロフェッショナルな用途
+- 音声品質にこだわりがある場合
+
+**技術詳細**:
+
+- サーバー: Python Edge TTS Server (http://localhost:8001)
+- 音声形式: MP3
+- デフォルト音声: ja-JP-NanamiNeural (女性)
+- 利用可能音声: Nanami, Keita, Aoi, Daichi, Mayu, Naoki, Shiori
+
+**セットアップ手順**:
+
+1. **Python TTS Server 起動**:
+
+   ```bash
+   cd python-tts-server
+   ./start_server.sh
+   ```
+
+2. **設定変更**:
+
+   ```json
+   {
+     "synthesizerType": "edge_tts"
+   }
+   ```
+
+3. **拡張機能リロード**: Chrome 拡張機能を更新
+
 ## 🔧 設定方法
 
 ### 1. 設定ファイルの編集
