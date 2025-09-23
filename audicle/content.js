@@ -315,28 +315,60 @@ function handleClick(event) {
     return;
   }
 
-  // 再生中でない場合、キュー構築
-  const hostname = window.location.hostname;
-
+  // 再生中でない場合、新しいルール管理システムを使用してキュー構築
   let queue = [];
-  if (customRules[hostname]) {
-    queue = buildQueueWithCustomRule(customRules[hostname]);
-  }
+  let extractionInfo = null; // 可観測性用
 
-  if (queue.length === 0) {
+  try {
+    // 新しいルール管理システムを優先使用
+    if (window.ExtractionRulesManager) {
+      console.log("handleClick: Using new integrated rules system");
+      const result = buildQueueWithNewRulesManager();
+      queue = result.queue;
+      extractionInfo = result.info;
+    } else {
+      console.warn("handleClick: New rules system not available, using legacy");
+      const result = buildQueueWithLegacySystem();
+      queue = result.queue;
+      extractionInfo = result.info;
+    }
+  } catch (error) {
+    console.error("New rules system failed, falling back to legacy:", error);
     try {
-      queue = buildQueueWithReadability();
-    } catch (e) {
-      console.error("Readability extraction failed:", e);
+      const result = buildQueueWithLegacySystem();
+      queue = result.queue;
+      extractionInfo = result.info;
+      extractionInfo.fallbackReason = error.message;
+    } catch (legacyError) {
+      console.error("Legacy system also failed:", legacyError);
+      queue = buildQueueWithFallback();
+      extractionInfo = {
+        rule: "emergency-fallback",
+        error: legacyError.message,
+      };
     }
   }
 
-  if (queue.length === 0) {
-    queue = buildQueueWithFallback();
+  // 可観測性: 採用されたルール情報をログ出力
+  if (extractionInfo) {
+    console.log(
+      `[🎯 Extraction Result] Rule: ${extractionInfo.rule}, Blocks: ${
+        extractionInfo.queueLength || queue.length
+      }, Domain: ${extractionInfo.domain}`
+    );
+    if (extractionInfo.priority) {
+      console.log(
+        `[📊 Rule Info] Priority: ${extractionInfo.priority}, Type: ${extractionInfo.type}`
+      );
+    }
+    if (extractionInfo.fallbackReason) {
+      console.log(`[⚠️  Fallback] Reason: ${extractionInfo.fallbackReason}`);
+    }
   }
 
   console.log("handleClick: Built queue length:", queue.length);
 
+  // キューが構築できた場合は再生開始
   if (queue.length > 0) {
     playbackQueue = queue;
     const clickedId = parseInt(target.dataset.audicleId);
@@ -365,6 +397,325 @@ function handleClick(event) {
   } else {
     console.error("handleClick: No queue built");
   }
+}
+
+// 新しいルール管理システムを使用したキュー構築（統合版）
+function buildQueueWithNewRulesManager() {
+  console.log("[NewRulesManager] Building queue with integrated rules system");
+
+  const manager = new window.ExtractionRulesManager();
+  const hostname = window.location.hostname;
+  const url = window.location.href;
+
+  // まず適用可能なルールを見つける
+  const rule = manager.findBestRule(hostname, url);
+  if (!rule) {
+    throw new Error("No applicable rule found for this page");
+  }
+
+  console.log(
+    `[NewRulesManager] Using rule: ${rule.id} (${rule.type}, priority: ${rule.priority})`
+  );
+
+  // ルールを使って抽出実行
+  const extraction = manager.extractContent(rule);
+
+  if (!extraction || extraction.length === 0) {
+    throw new Error(`Rule ${rule.id} failed to extract content`);
+  }
+
+  const queue = extraction.map((item, index) => {
+    const element = item.element;
+    const text = item.text;
+
+    return {
+      text: text,
+      blockIndex: index,
+      element: element,
+      status: "ready",
+      paragraphId: item.id || index, // item.idを優先、なければindexを使用
+    };
+  });
+
+  const info = {
+    rule: rule.id,
+    priority: rule.priority,
+    type: rule.type,
+    domain: hostname,
+    queueLength: queue.length,
+  };
+
+  console.log(
+    `[NewRulesManager] Successfully built queue: ${queue.length} items using rule '${rule.id}'`
+  );
+
+  return { queue, info };
+}
+
+// レガシーシステムを使用したキュー構築
+function buildQueueWithLegacySystem() {
+  console.log("[LegacySystem] Building queue with legacy rules system");
+
+  const hostname = window.location.hostname;
+  let queue = [];
+  let info = { rule: "unknown", domain: hostname };
+
+  if (customRules[hostname]) {
+    console.log("[LegacySystem] Using custom rule for", hostname);
+    queue = buildQueueWithCustomRule(customRules[hostname]);
+    info.rule = "custom-" + hostname;
+    info.type = "site-specific";
+  }
+
+  if (queue.length === 0) {
+    try {
+      console.log("[LegacySystem] Trying Readability extraction");
+      queue = buildQueueWithReadability();
+      info.rule = "readability";
+      info.type = "library";
+    } catch (e) {
+      console.error("Readability extraction failed:", e);
+    }
+  }
+
+  if (queue.length === 0) {
+    console.log("[LegacySystem] Using fallback extraction");
+    queue = buildQueueWithFallback();
+    info.rule = "fallback";
+    info.type = "emergency";
+  }
+
+  info.queueLength = queue.length;
+  console.log(
+    `[LegacySystem] Built queue: ${queue.length} items using rule '${info.rule}'`
+  );
+
+  return { queue, info };
+}
+
+// 現在のページで使用可能なルール情報を取得
+function getCurrentPageRuleInfo() {
+  const hostname = window.location.hostname;
+  const url = window.location.href;
+
+  let ruleInfo = {
+    hostname,
+    url,
+    availableRules: [],
+  };
+
+  // 新しいルール管理システムでの情報取得
+  if (window.ExtractionRulesManager) {
+    try {
+      const manager = new window.ExtractionRulesManager();
+      const matchedRule = manager.findBestRule(hostname, url);
+      if (matchedRule) {
+        ruleInfo.activeRule = {
+          id: matchedRule.id,
+          priority: matchedRule.priority,
+          type: matchedRule.type,
+          system: "new",
+        };
+      }
+    } catch (error) {
+      console.warn("[getCurrentPageRuleInfo] New rules manager error:", error);
+    }
+  }
+
+  // レガシールールでの情報
+  if (customRules[hostname]) {
+    ruleInfo.legacyRule = {
+      id: "legacy-" + hostname,
+      type: "site-specific-legacy",
+      system: "legacy",
+    };
+  }
+
+  // Readability利用可能性
+  ruleInfo.readabilityAvailable = typeof window.Readability !== "undefined";
+
+  console.log("[\ud83d\udd0d Page Rule Info]", ruleInfo);
+  return ruleInfo;
+}
+
+// 即座にグローバル公開（関数定義直後）
+if (typeof window !== "undefined") {
+  window.getCurrentPageRuleInfo = getCurrentPageRuleInfo;
+}
+
+// 初期化時に現在のページのルール情報を表示
+document.addEventListener("DOMContentLoaded", () => {
+  // グローバル関数として公開（確実に実行されるタイミング）
+  window.getCurrentPageRuleInfo = getCurrentPageRuleInfo;
+
+  // システム状態をログ出力
+  console.log("[🚀 Audicle Initialized]");
+  console.log(
+    "- New Rules Manager:",
+    window.ExtractionRulesManager ? "✅ Available" : "❌ Not loaded"
+  );
+  console.log(
+    "- Legacy Rules:",
+    Object.keys(customRules).length,
+    "site-specific rules"
+  );
+  console.log(
+    "- Readability.js:",
+    window.Readability ? "✅ Available" : "⏳ Will load dynamically"
+  );
+
+  // 現在のページで採用されるルール情報を自動表示
+  setTimeout(() => {
+    const ruleInfo = getCurrentPageRuleInfo();
+
+    if (ruleInfo.activeRule) {
+      console.log(
+        `[📋 Current Page Rule] ${ruleInfo.activeRule.id} (${ruleInfo.activeRule.system} system, priority: ${ruleInfo.activeRule.priority})`
+      );
+    } else if (ruleInfo.legacyRule) {
+      console.log(
+        `[📋 Current Page Rule] ${ruleInfo.legacyRule.id} (legacy system)`
+      );
+    } else if (ruleInfo.readabilityAvailable) {
+      console.log("[📋 Current Page Rule] Readability.js (fallback)");
+    } else {
+      console.log(
+        "[📋 Current Page Rule] Emergency fallback (basic text extraction)"
+      );
+    }
+
+    console.log(`[🌐 Page Info] ${ruleInfo.hostname}`);
+  }, 500);
+});
+
+// レガシーシステムでのキュー構築（既存動作保護）
+function buildQueueWithLegacySystem() {
+  console.log("[LegacySystem] Using legacy extraction system");
+
+  const hostname = window.location.hostname;
+  let queue = [];
+  let usedRule = "none";
+
+  // 既存のカスタムルール
+  if (customRules[hostname]) {
+    console.log(`[LegacySystem] Using custom rule for ${hostname}`);
+    queue = buildQueueWithCustomRule(customRules[hostname]);
+    usedRule = `custom-${hostname}`;
+  }
+
+  // Readability.js
+  if (queue.length === 0) {
+    try {
+      console.log("[LegacySystem] Trying Readability extraction");
+      queue = buildQueueWithReadability();
+      usedRule = "readability";
+    } catch (e) {
+      console.warn("Readability extraction failed:", e);
+    }
+  }
+
+  // フォールバック
+  if (queue.length === 0) {
+    console.log("[LegacySystem] Using fallback extraction");
+    queue = buildQueueWithFallback();
+    usedRule = "fallback";
+  }
+
+  return {
+    queue: queue,
+    info: {
+      rule: usedRule,
+      type: "legacy",
+      priority: "unknown",
+      queueLength: queue.length,
+      domain: hostname,
+    },
+  };
+}
+
+// 新しいルールマネージャーを使用したキュー構築
+function buildQueueWithRulesManager() {
+  console.log("[RulesManager] Building queue with new rules manager");
+
+  // ルールマネージャーのインスタンスを作成
+  const rulesManager = new window.ExtractionRulesManager();
+
+  // 適用可能なルールを取得
+  const applicableRules = rulesManager.getApplicableRules();
+  console.log(
+    "[RulesManager] Found applicable rules:",
+    applicableRules.map((r) => `${r.name} (priority: ${r.priority})`)
+  );
+
+  // 優先順位に従って順次試行
+  for (const rule of applicableRules) {
+    try {
+      console.log(`[RulesManager] Trying rule: ${rule.name}`);
+
+      // Readabilityライブラリが必要な場合は事前に注入
+      if (rule.extractStrategy.requiresLibrary) {
+        injectReadabilityLib();
+        // ライブラリの読み込み待ち（簡易チェック）
+        if (typeof Readability === "undefined") {
+          console.warn(
+            `[RulesManager] ${rule.name} requires Readability library but not available`
+          );
+          continue;
+        }
+      }
+
+      const blocks = rulesManager.extractContent(rule);
+
+      if (blocks && blocks.length > 0) {
+        console.log(
+          `[RulesManager] ✅ Successfully extracted ${blocks.length} blocks with rule: ${rule.name}`
+        );
+
+        // 既存の形式に変換してキューを構築
+        return convertBlocksToQueue(blocks);
+      }
+    } catch (error) {
+      console.warn(`[RulesManager] Rule ${rule.name} failed:`, error.message);
+      continue;
+    }
+  }
+
+  console.error("[RulesManager] All rules failed");
+  return [];
+}
+
+// 新しいブロック形式を既存のキュー形式に変換
+function convertBlocksToQueue(blocks) {
+  console.log(
+    `[RulesManager] Converting ${blocks.length} blocks to queue format`
+  );
+
+  const queue = [];
+
+  blocks.forEach((block, index) => {
+    // 各ブロックのテキストを200文字ごとに分割
+    const chunkSize = 200;
+    const text = block.text;
+
+    for (let i = 0; i < text.length; i += chunkSize) {
+      const chunk = text.slice(i, i + chunkSize).trim();
+      if (chunk) {
+        queue.push({
+          text: chunk,
+          paragraphId: block.id,
+        });
+      }
+    }
+
+    // 要素にIDとクラスを設定（ハイライト用）
+    if (block.element) {
+      block.element.dataset.audicleId = block.id;
+      block.element.classList.add("audicle-clickable");
+    }
+  });
+
+  console.log(`[RulesManager] Converted to ${queue.length} queue chunks`);
+  return queue;
 }
 
 // 独自ルールでキューを構築

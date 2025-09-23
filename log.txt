@@ -1,0 +1,123 @@
+Attestation check for Topics on <URL> failed.Understand this error
+rules.js:417 [ExtractionRules] Rules manager loaded
+bdba7a02e5394a79f81f:1 Unchecked runtime.lastError: The message port closed before a response was received.Understand this error
+bdba7a02e5394a79f81f:1 Unchecked runtime.lastError: The message port closed before a response was received.Understand this error
+yads-async.js:1 Allow attribute will take precedence over 'allowfullscreen'.
+insertTag @ yads-async.js:1
+openYADSIframe @ yads-async.js:1
+dispatch @ yads-async.js:1
+dispatch @ yads-async.js:1
+dispatch @ yads-async.js:1
+(anonymous) @ yads-async.js:1
+(anonymous) @ yads-async.js:1
+ee @ yads-async.js:1
+t @ yads-async.js:1
+await in t
+ee.execFuncForcibly @ yads-async.js:1
+ee @ yads-async.js:1
+ze @ yads-async.js:1
+render @ yads-async.js:1
+dispatch @ yads-async.js:1
+observe @ yads-async.js:1
+(anonymous) @ yads-async.js:1
+(anonymous) @ yads-async.js:1
+(anonymous) @ yads-async.js:1Understand this warning
+[Violation] Potential permissions policy violation: fullscreen is not allowed in this document.Understand this error
+content.js:284 handleClick: Clicked element: <p data-sourcepos=​"4:​1-6:​54" data-audicle-id=​"1" class=​"audicle-clickable">​…​</p>​ ID: 1 isPlaying: false
+content.js:325 handleClick: Using new integrated rules system
+content.js:404 [NewRulesManager] Building queue with integrated rules system
+rules.js:152 [ExtractionRules] Finding best rule for: qiita.com
+rules.js:157 [ExtractionRules] Found site-specific rule: qiita-custom
+content.js:416 [NewRulesManager] Using rule: qiita-custom (site-specific, priority: 1000)
+rules.js:228 [ExtractionRules] Applying rule: Qiita記事抽出 (site-specific)
+rules.js:267 [ExtractionRules] Found container: #personal-public-article-body .mdContent-inner
+rules.js:369 [ExtractionRules] Extraction completed: {timestamp: '2025-09-23T12:43:13.223Z', rule: {…}, url: 'https://qiita.com/irochi/items/bdba7a02e5394a79f81f', success: true, blocksFound: 72, …}
+content.js:448 [NewRulesManager] Successfully built queue: 72 items using rule 'qiita-custom'
+content.js:354 [🎯 Extraction Result] Rule: qiita-custom, Blocks: 72, Domain: qiita.com
+content.js:360 [📊 Rule Info] Priority: 1000, Type: site-specific
+content.js:369 handleClick: Built queue length: 72
+content.js:381 handleClick: Starting at index: 1 for ID: 1
+content.js:1024 fullBatchFetch: Fetching 72 items in batch
+content.js:1029 fullBatchFetch: Received 72 audio URLs
+content.js:1036 fullBatchFetch: Cached audio for index: 0
+content.js:1036 fullBatchFetch: Cached audio for index: 1
+content.js:1036 fullBatchFetch: Cached audio for index: 2
+content.js:1036 fullBatchFetch: Cached audio for index: 3
+content.js:1036 fullBatchFetch: Cached audio for index: 4
+content.js:1036 fullBatchFetch: Cached audio for index: 5
+content.js:1036 fullBatchFetch: Cached audio for index: 6
+content.js:1036 fullBatchFetch: Cached audio for index: 7
+content.js:1036 fullBatchFetch: Cached audio for index: 8
+content.js:1036 fullBatchFetch: Cached audio for index: 9
+content.js:1036 fullBatchFetch: Cached audio for index: 10
+content.js:1036 fullBatchFetch: Cached audio for index: 11
+content.js:1036 fullBatchFetch: Cached audio for index: 12
+content.js:1036 fullBatchFetch: Cached audio for index: 13
+content.js:1036 fullBatchFetch: Cached audio for index: 14
+content.js:1036 fullBatchFetch: Cached audio for index: 15
+content.js:1036 fullBatchFetch: Cached audio for index: 16
+content.js:1036 fullBatchFetch: Cached audio for index: 17
+content.js:1036 fullBatchFetch: Cached audio for index: 18
+content.js:1036 fullBatchFetch: Cached audio for index: 19
+content.js:1036 fullBatchFetch: Cached audio for index: 20
+content.js:1036 fullBatchFetch: Cached audio for index: 21
+content.js:1036 fullBatchFetch: Cached audio for index: 22
+content.js:1036 fullBatchFetch: Cached audio for index: 23
+content.js:1036 fullBatchFetch: Cached audio for index: 24
+content.js:1036 fullBatchFetch: Cached audio for index: 25
+content.js:1036 fullBatchFetch: Cached audio for index: 26
+content.js:1036 fullBatchFetch: Cached audio for index: 27
+content.js:1036 fullBatchFetch: Cached audio for index: 28
+content.js:1036 fullBatchFetch: Cached audio for index: 29
+content.js:1036 fullBatchFetch: Cached audio for index: 30
+content.js:1036 fullBatchFetch: Cached audio for index: 31
+content.js:1036 fullBatchFetch: Cached audio for index: 32
+content.js:1036 fullBatchFetch: Cached audio for index: 33
+content.js:1036 fullBatchFetch: Cached audio for index: 34
+content.js:1036 fullBatchFetch: Cached audio for index: 35
+content.js:1036 fullBatchFetch: Cached audio for index: 36
+content.js:1036 fullBatchFetch: Cached audio for index: 37
+content.js:1036 fullBatchFetch: Cached audio for index: 38
+content.js:1036 fullBatchFetch: Cached audio for index: 39
+content.js:1036 fullBatchFetch: Cached audio for index: 40
+content.js:1036 fullBatchFetch: Cached audio for index: 41
+content.js:1036 fullBatchFetch: Cached audio for index: 42
+content.js:1036 fullBatchFetch: Cached audio for index: 43
+content.js:1036 fullBatchFetch: Cached audio for index: 44
+content.js:1036 fullBatchFetch: Cached audio for index: 45
+content.js:1036 fullBatchFetch: Cached audio for index: 46
+content.js:1036 fullBatchFetch: Cached audio for index: 47
+content.js:1036 fullBatchFetch: Cached audio for index: 48
+content.js:1036 fullBatchFetch: Cached audio for index: 49
+content.js:1036 fullBatchFetch: Cached audio for index: 50
+content.js:1036 fullBatchFetch: Cached audio for index: 51
+content.js:1036 fullBatchFetch: Cached audio for index: 52
+content.js:1036 fullBatchFetch: Cached audio for index: 53
+content.js:1036 fullBatchFetch: Cached audio for index: 54
+content.js:1036 fullBatchFetch: Cached audio for index: 55
+content.js:1036 fullBatchFetch: Cached audio for index: 56
+content.js:1036 fullBatchFetch: Cached audio for index: 57
+content.js:1036 fullBatchFetch: Cached audio for index: 58
+content.js:1036 fullBatchFetch: Cached audio for index: 59
+content.js:1036 fullBatchFetch: Cached audio for index: 60
+content.js:1036 fullBatchFetch: Cached audio for index: 61
+content.js:1036 fullBatchFetch: Cached audio for index: 62
+content.js:1036 fullBatchFetch: Cached audio for index: 63
+content.js:1036 fullBatchFetch: Cached audio for index: 64
+content.js:1036 fullBatchFetch: Cached audio for index: 65
+content.js:1036 fullBatchFetch: Cached audio for index: 66
+content.js:1036 fullBatchFetch: Cached audio for index: 67
+content.js:1036 fullBatchFetch: Cached audio for index: 68
+content.js:1036 fullBatchFetch: Cached audio for index: 69
+content.js:1036 fullBatchFetch: Cached audio for index: 70
+content.js:1036 fullBatchFetch: Cached audio for index: 71
+content.js:1038 fullBatchFetch: All audio cached, starting playback
+content.js:856 playQueue: Playing item at index: 1 text length: 63 paragraphId: 1 text: 今回はタイトルの通り、
+「新卒で入社したホワイト企業を８ヶ月で退職することになった話」を
+みなさんにお伝えしていこう思います！
+content.js:875 playQueue: Using cached audio for index: 1
+v3-article-bundle-e6d7f9db962ab9bc.min.js:2 Download the Apollo DevTools for a better development experience: https://chrome.google.com/webstore/detail/apollo-client-developer-t/jdkknkkbebbapilgoeccciglkfbmbnfm
+getCurrentPageRuleInfo()
+VM26787:1 Uncaught ReferenceError: getCurrentPageRuleInfo is not defined
+    at <anonymous>:1:1
+(anonymous) @ VM26787:1Understand this error
