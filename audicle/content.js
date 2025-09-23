@@ -21,6 +21,9 @@ const MAX_RETRIES = 2;
 // バッチサイズ
 const BATCH_SIZE = 3;
 
+// テキスト分割設定
+const CHUNK_SIZE = 200; // 200文字ごとに分割（0にすると分割なし）
+
 // ----- Readability 注入 & カスタムルール定義 -----
 // ドメインごとの独自抽出ルール（まずは qiita.com のプレースホルダ）
 const customRules = {
@@ -271,6 +274,28 @@ function updateHighlight(paragraphId) {
     );
     if (element) {
       element.classList.add("audicle-highlight");
+
+      // 自動スクロール: 要素が画面に見えるようにスクロール
+      try {
+        element.scrollIntoView({
+          behavior: "smooth",
+          block: "center", // 画面中央に配置
+          inline: "nearest",
+        });
+        console.log(
+          "updateHighlight: Auto-scrolled to paragraphId:",
+          paragraphId
+        );
+      } catch (error) {
+        console.warn("updateHighlight: ScrollIntoView failed:", error);
+        // フォールバック: 古いブラウザ向け
+        element.scrollIntoView(true);
+      }
+    } else {
+      console.warn(
+        "updateHighlight: Element not found for paragraphId:",
+        paragraphId
+      );
     }
   }
 }
@@ -294,23 +319,104 @@ function handleClick(event) {
   if (isPlaying && playbackQueue.length > 0) {
     const clickedId = parseInt(target.dataset.audicleId);
     if (!isNaN(clickedId)) {
-      const startIndex = playbackQueue.findIndex(
-        (item) => item.paragraphId === clickedId
+      console.log(
+        "handleClick: Searching for paragraphId:",
+        clickedId,
+        "in queue of",
+        playbackQueue.length,
+        "items"
       );
-      if (startIndex !== -1) {
-        queueIndex = startIndex;
+
+      // 同じparagraphIdを持つ複数のチャンクがある場合、現在位置から最も近いものを選択
+      let bestIndex = -1;
+      let bestDistance = Infinity;
+
+      playbackQueue.forEach((item, index) => {
+        if (item.paragraphId === clickedId) {
+          const distance = Math.abs(index - queueIndex);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestIndex = index;
+          }
+        }
+      });
+
+      if (bestIndex !== -1) {
         console.log(
-          "handleClick: Jumping to index:",
-          startIndex,
+          "handleClick: Found at index:",
+          bestIndex,
           "for ID:",
-          clickedId
+          clickedId,
+          "current queueIndex:",
+          queueIndex,
+          "distance:",
+          bestDistance
         );
+        queueIndex = bestIndex;
         // 現在の再生を停止し、新しい位置から再生
         audioPlayer.pause();
-        playQueue();
+        // ハイライトを即座に更新
+        updateHighlight(clickedId);
+
+        // 新しい位置から必要な音声を段階的に読み込み
+        const JUMP_BATCH_SIZE = 3;
+        const jumpBatch = [];
+
+        for (
+          let i = bestIndex;
+          i < Math.min(bestIndex + JUMP_BATCH_SIZE, playbackQueue.length);
+          i++
+        ) {
+          if (!audioCache.has(i)) {
+            const item = playbackQueue[i];
+            if (item && item.text) {
+              jumpBatch.push({ index: i, text: item.text });
+            }
+          }
+        }
+
+        if (jumpBatch.length > 0) {
+          console.log(
+            `handleClick: Fetching ${jumpBatch.length} items from jump position`
+          );
+          chrome.runtime.sendMessage(
+            { command: "fullBatchFetch", batch: jumpBatch },
+            (response) => {
+              if (response && response.audioDataUrls) {
+                response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
+                  audioCache.set(index, audioDataUrl);
+                });
+              }
+              playQueue();
+              // バックグラウンドで残りを読み込み
+              fetchRemainingInBackground(bestIndex + JUMP_BATCH_SIZE);
+            }
+          );
+        } else {
+          playQueue();
+          // バックグラウンドで残りを読み込み
+          fetchRemainingInBackground(bestIndex + JUMP_BATCH_SIZE);
+        }
       } else {
-        console.warn("handleClick: ID not found in current queue");
+        console.warn(
+          "handleClick: ID",
+          clickedId,
+          "not found in current queue"
+        );
+        // デバッグ: キューの最初の5項目を表示
+        console.log(
+          "Queue sample:",
+          playbackQueue.slice(0, 5).map((item) => ({
+            id: item.paragraphId,
+            text: item.text.substring(0, 20),
+          }))
+        );
       }
+    } else {
+      console.warn(
+        "handleClick: Invalid clicked ID:",
+        target.dataset.audicleId
+      );
     }
     return;
   }
@@ -373,16 +479,23 @@ function handleClick(event) {
     playbackQueue = queue;
     const clickedId = parseInt(target.dataset.audicleId);
     if (!isNaN(clickedId)) {
-      const startIndex = queue.findIndex(
-        (item) => item.paragraphId === clickedId
-      );
+      // 同じparagraphIdを持つ複数のチャンクがある場合、最初のものを選択
+      let startIndex = -1;
+      for (let i = 0; i < queue.length; i++) {
+        if (queue[i].paragraphId === clickedId) {
+          startIndex = i;
+          break;
+        }
+      }
+
       if (startIndex !== -1) {
         queueIndex = startIndex;
         console.log(
           "handleClick: Starting at index:",
           startIndex,
           "for ID:",
-          clickedId
+          clickedId,
+          "first chunk of this paragraph"
         );
       } else {
         queueIndex = 0;
@@ -392,8 +505,8 @@ function handleClick(event) {
       queueIndex = 0;
       console.warn("handleClick: No valid ID, starting at 0");
     }
-    // 全キューを一括フェッチしてから再生開始
-    fullBatchFetch(() => playQueue());
+    // 段階的読み込みで再生開始
+    progressiveFetch(() => playQueue());
   } else {
     console.error("handleClick: No queue built");
   }
@@ -424,17 +537,54 @@ function buildQueueWithNewRulesManager() {
     throw new Error(`Rule ${rule.id} failed to extract content`);
   }
 
-  const queue = extraction.map((item, index) => {
+  // 抽出されたブロックを200文字分割キューに変換
+  const queue = [];
+
+  extraction.forEach((item, blockIndex) => {
     const element = item.element;
     const text = item.text;
+    const paragraphId = item.id || blockIndex;
 
-    return {
-      text: text,
-      blockIndex: index,
-      element: element,
-      status: "ready",
-      paragraphId: item.id || index, // item.idを優先、なければindexを使用
-    };
+    // デバッグ: 要素の処理順序を確認
+    const tagName = element ? element.tagName.toLowerCase() : "unknown";
+    const textPreview = text ? text.substring(0, 30) + "..." : "no text";
+    console.log(
+      `[NewRulesManager] Processing block ${blockIndex}: ${tagName} (id: ${paragraphId}) - "${textPreview}"`
+    );
+
+    // 要素にIDとクラスを設定（ハイライト用）
+    if (element) {
+      element.dataset.audicleId = paragraphId;
+      element.classList.add("audicle-clickable");
+    }
+
+    // 200文字ごとに分割して音声キューに追加
+    if (text && text.length > 0) {
+      if (CHUNK_SIZE > 0) {
+        // チャンク分割を行う場合
+        for (let i = 0; i < text.length; i += CHUNK_SIZE) {
+          const chunk = text.slice(i, i + CHUNK_SIZE).trim();
+          if (chunk) {
+            queue.push({
+              text: chunk,
+              paragraphId: paragraphId,
+              blockIndex: blockIndex,
+              element: element,
+              status: "ready",
+            });
+          }
+        }
+      } else {
+        // チャンク分割なし：段落全体を1つのアイテムとして追加
+        queue.push({
+          text: text.trim(),
+          paragraphId: paragraphId,
+          blockIndex: blockIndex,
+          element: element,
+          status: "ready",
+        });
+      }
+    }
   });
 
   const info = {
@@ -446,7 +596,7 @@ function buildQueueWithNewRulesManager() {
   };
 
   console.log(
-    `[NewRulesManager] Successfully built queue: ${queue.length} items using rule '${rule.id}'`
+    `[NewRulesManager] Successfully built queue: ${queue.length} chunks from ${extraction.length} blocks using rule '${rule.id}'`
   );
 
   return { queue, info };
@@ -1011,6 +1161,146 @@ function prefetchBatch(startIndex) {
 }
 
 // 全キューを一括フェッチ
+// 段階的フェッチ: 最初の数個を読み込んで即座に再生開始
+function progressiveFetch(callback) {
+  const INITIAL_BATCH_SIZE = 5; // 最初に読み込む数
+
+  // 最初のバッチ（開始位置から5個）を準備
+  const initialBatch = [];
+  const startIndex = queueIndex;
+
+  for (
+    let i = startIndex;
+    i < Math.min(startIndex + INITIAL_BATCH_SIZE, playbackQueue.length);
+    i++
+  ) {
+    if (!audioCache.has(i)) {
+      const item = playbackQueue[i];
+      if (item && item.text) {
+        initialBatch.push({ index: i, text: item.text });
+      }
+    }
+  }
+
+  if (initialBatch.length === 0) {
+    console.log(
+      "progressiveFetch: Initial batch already cached, starting playback"
+    );
+    callback();
+    // バックグラウンドで残りを読み込み
+    fetchRemainingInBackground(startIndex + INITIAL_BATCH_SIZE);
+    return;
+  }
+
+  console.log(
+    `progressiveFetch: Fetching initial batch of ${initialBatch.length} items for immediate playback`
+  );
+
+  // 最初のバッチを取得
+  chrome.runtime.sendMessage(
+    { command: "fullBatchFetch", batch: initialBatch },
+    (response) => {
+      if (response && response.audioDataUrls) {
+        console.log(
+          "progressiveFetch: Received",
+          response.audioDataUrls.length,
+          "initial audio URLs"
+        );
+        response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
+          audioCache.set(index, audioDataUrl);
+          console.log(
+            "progressiveFetch: Cached initial audio for index:",
+            index
+          );
+        });
+        console.log("progressiveFetch: Initial batch ready, starting playback");
+      } else {
+        console.error("progressiveFetch: No response for initial batch");
+      }
+
+      // 再生開始
+      callback();
+
+      // バックグラウンドで残りを読み込み
+      fetchRemainingInBackground(startIndex + INITIAL_BATCH_SIZE);
+    }
+  );
+}
+
+// バックグラウンドで残りの音声を読み込み（前後両方向）
+function fetchRemainingInBackground(priorityStartIndex) {
+  // 前方向（未来）と後方向（過去）に分けて収集
+  const forwardBatch = []; // クリック位置より後ろ（優先）
+  const backwardBatch = []; // クリック位置より前（後回し）
+
+  // 前方向（priorityStartIndex以降）を収集
+  for (let i = priorityStartIndex; i < playbackQueue.length; i++) {
+    if (!audioCache.has(i)) {
+      const item = playbackQueue[i];
+      if (item && item.text) {
+        forwardBatch.push({ index: i, text: item.text });
+      }
+    }
+  }
+
+  // 後方向（queueIndexより前）を収集
+  for (let i = 0; i < queueIndex; i++) {
+    if (!audioCache.has(i)) {
+      const item = playbackQueue[i];
+      if (item && item.text) {
+        backwardBatch.push({ index: i, text: item.text });
+      }
+    }
+  }
+
+  console.log(
+    `fetchRemainingInBackground: Forward: ${forwardBatch.length} items, Backward: ${backwardBatch.length} items`
+  );
+
+  // 前方向を最優先で読み込み
+  if (forwardBatch.length > 0) {
+    fetchBatchInChunks(forwardBatch, "forward", 0);
+  }
+
+  // 後方向は少し遅延させて読み込み
+  if (backwardBatch.length > 0) {
+    setTimeout(() => {
+      fetchBatchInChunks(backwardBatch, "backward", 2000); // 2秒遅延
+    }, 1000);
+  }
+}
+
+// バッチを小さなチャンクに分割して順次取得
+function fetchBatchInChunks(batch, direction, initialDelay = 0) {
+  const BACKGROUND_BATCH_SIZE = 8; // 少し小さく調整
+
+  for (let i = 0; i < batch.length; i += BACKGROUND_BATCH_SIZE) {
+    const chunk = batch.slice(i, i + BACKGROUND_BATCH_SIZE);
+
+    setTimeout(() => {
+      console.log(
+        `fetchBatchInChunks: Fetching ${direction} chunk ${
+          Math.floor(i / BACKGROUND_BATCH_SIZE) + 1
+        } (${chunk.length} items)`
+      );
+      chrome.runtime.sendMessage(
+        { command: "fullBatchFetch", batch: chunk },
+        (response) => {
+          if (response && response.audioDataUrls) {
+            response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
+              audioCache.set(index, audioDataUrl);
+              console.log(
+                `fetchBatchInChunks: Cached ${direction} audio for index:`,
+                index
+              );
+            });
+          }
+        }
+      );
+    }, initialDelay + i * 600); // 600ms間隔（少し短縮）
+  }
+}
+
 function fullBatchFetch(callback) {
   const batch = [];
   for (let i = 0; i < playbackQueue.length; i++) {

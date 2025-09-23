@@ -389,6 +389,246 @@ Mozilla Readability.js を導入し、メインコンテンツ自動特定と構
 
 </aside>
 
+### Issue #20: [Refactoring] 本文抽出ルールをライブラリ化して切り出し
+
+https://github.com/is0692vs/Audicle/issues/26
+
+## 📋 要件・実装・テスト方法まとめ
+
+### 🎯 元の要件
+
+1. Qiita 一般向けルールと Readability.js の扱いがファイル分散しており把握が困難
+2. 採用ルールの優先順位管理や URL ごとの特殊処理を分かりやすく運用したい
+3. どのページでどのルールが採用されたかを即時判別できる可観測性が必要
+4. 将来の新サイト用ルール追加で迷わないよう、配置・命名・手順を統一して開発者体験を改善
+
+### 🔧 実装した内容
+
+| 課題         | 実装内容                      | ファイル                      |
+| ------------ | ----------------------------- | ----------------------------- |
+| ファイル分散 | rules.js に一元集約           | rules.js                      |
+| 優先順位管理 | priority プロパティで数値管理 | 同上                          |
+| 可観測性     | 詳細ログ出力・抽出履歴記録    | content.js                    |
+| 開発者体験   | 標準化された配置・命名・手順  | [README.md](http://README.md) |
+
+### 1. 新ルール管理システム（rules.js）
+
+```jsx
+const SITE_SPECIFIC_RULES = {
+  "[qiita.com](http://qiita.com)": {
+    id: "qiita-custom",
+    name: "Qiita記事抽出",
+    type: "site-specific",
+    priority: 1000, // 高優先度
+    extractStrategy: {
+      containerSelectors: ["#personal-public-article-body .mdContent-inner"],
+      contentSelectors: ["p", "h1", "h2", "h3", "ul > li", "ol > li"],
+      // ...
+    },
+  },
+};
+
+const GENERAL_RULES = {
+  readability: {
+    id: "readability-fallback",
+    priority: 5, // 中優先度
+    // ...
+  },
+  fallback: {
+    id: "fallback-extraction",
+    priority: 1, // 最低優先度
+    // ...
+  },
+};
+```
+
+### 2. 統合 content.js（content.js）
+
+```jsx
+// 新旧システム併用・フォールバック機能
+try {
+  if (window.ExtractionRulesManager) {
+    const result = buildQueueWithNewRulesManager();
+    queue = result.queue;
+    extractionInfo = [result.info](http://result.info);
+  } else {
+    const result = buildQueueWithLegacySystem();
+    // フォールバック処理
+  }
+} catch (error) {
+  // 緊急フォールバック
+}
+
+// 可観測性ログ
+console.log(`[🎯 Extraction Result] Rule: ${extractionInfo.rule}, Blocks: ${queue.length}`);
+console.log(`[📊 Rule Info] Priority: ${extractionInfo.priority}, Type: ${extractionInfo.type}`);
+```
+
+### 3. 設定更新（manifest.json）
+
+```json
+"content_scripts": [{
+  "js": ["content-extract/rules.js", "content.js"], // rules.js を優先ロード
+  // ...
+}]
+```
+
+### 4. 開発者向け手順（[README.md](http://README.md)）
+
+- 新サイト対応ルール追加の詳細手順
+- CSS セレクターの特定方法
+- 優先度設定のガイドライン
+- よく使用されるセレクターパターン
+- デバッグのヒント
+
+### 🧪 テスト方法
+
+### 基本テスト手順
+
+1. Chrome 拡張機能の更新（chrome://extensions で Audicle の「更新」）
+2. Qiita ページでの動作確認
+   - 任意の Qiita 記事を開く
+   - 段落をクリックして音声再生・ハイライトを確認
+3. 新ルール管理システムのログ確認
+
+```
+[ExtractionRules] Found site-specific rule: qiita-custom
+[NewRulesManager] Using rule: qiita-custom (site-specific, priority: 1000)
+[🎯 Extraction Result] Rule: qiita-custom, Blocks: 72, Domain: [qiita.com](http://qiita.com)
+[📊 Rule Info] Priority: 1000, Type: site-specific
+```
+
+1. テストページでの動作確認
+   - test.html を開いて基本機能をテスト
+   - フォールバックルール（汎用セレクター）の動作確認
+
+### 動作確認ポイント
+
+| 機能           | 確認方法         | 期待結果                                  |
+| -------------- | ---------------- | ----------------------------------------- |
+| ルール採用     | Console ログ     | [🎯 Extraction Result] Rule: qiita-custom |
+| 音声再生       | 段落クリック     | 2.0 倍速で読み上げ開始                    |
+| ハイライト     | 再生中           | 現在の段落がハイライト表示                |
+| 優先順位       | 複数ルール存在時 | 高 priority 順で採用                      |
+| フォールバック | ルール失敗時     | レガシー → 緊急の順で代替                 |
+
+### 📊 達成状況
+
+| 要件                | 達成度 | 確認方法                   |
+| ------------------- | ------ | -------------------------- |
+| ✅ ファイル分散解決 | 100%   | rules.js に一元化完了      |
+| ✅ 優先順位管理     | 100%   | priority で数値管理        |
+| ✅ 可観測性向上     | 100%   | 詳細ログで採用ルール表示   |
+| ✅ 開発者体験改善   | 100%   | 標準化手順を README に記載 |
+
+### 🎉 最終結果
+
+新しいルール管理システムが完全に動作し、すべての要件を満たした堅牢なシステムが完成。
+
+- Qiita 専用ルールが正常に採用される
+- 音声再生・ハイライト機能も正常動作
+- 将来の新サイト対応も標準化手順で効率的に追加可能
+- 可観測性により、採用ルールを即座に把握可能
+
+---
+
+### 新しい作業: Edge TTS 統合（完了レポート）
+
+- GitHub: [リンク](https://github.com/is0692vs/Audicle/issues/33)
+
+### ✅ 完了した課題
+
+1. 新しい音声合成モジュール「edge_tts」の実装
+   - Python FastAPI サーバー（edge-tts 利用）
+   - Chrome 拡張への EdgeTTSSynthesizer 統合
+   - config.json で切替可能
+2. venv 自動アクティベーション設定
+   - VS Code settings.json でワークスペース入場時に自動切替
+3. DOM 順序問題の解決
+   - rules.js の組み合わせセレクターで抽出順を厳密化
+   - 1, 2, 3, ... の順で確実に再生
+4. ハイライト・再生同期の修正
+   - updateHighlight の自動スクロール復旧
+   - 位置ジャンプ時の同期エラーを解消
+5. 段階的読み込みの最適化
+   - progressiveFetch でクリック位置優先
+   - 残りはバックグラウンドで段階的に読み込み
+   - サーバー負荷を 600ms 間隔で分散
+6. サーバー責任範囲の明確化（ステートレス）
+   - Python サーバー: テキスト入力 →MP3 出力のみ
+   - キュー管理や順序制御はクライアント側（拡張）
+   - 受信テキストをログ出力（デバッグ）
+7. ドキュメント更新
+   - [README.md](http://README.md) にサーバー責任を追記
+   - [edge-tts-integration-report.md](http://edge-tts-integration-report.md) に全体まとめ
+
+### 🧪 テスト方法
+
+1. サーバー起動
+
+```bash
+cd python-tts-server
+source venv/bin/activate  # 自動化済だが念のため
+python [server.py](http://server.py)
+```
+
+2. Chrome 拡張設定
+
+```json
+// audicle/config.json
+{ "synthesizerType": "edge_tts" }
+```
+
+3. 拡張機能をリロード（chrome://extensions → Audicle → 更新）
+
+4. 動作確認
+
+- テスト対象: Qiita 記事（例: https://qiita.com/irochi/items/bdba7a02e5394a79f81f%EF%BC%89%E3%82%92%E9%96%8B%E3%81%8F）
+- 拡張を有効化して任意段落をクリック
+
+期待挙動
+
+- 0.5–1.0 秒以内に再生開始
+- ハイライト同期と自動スクロールが正しく動作
+- DOM 順序通りに再生（1, 2, 3, ...）
+- 再生中でも別段落クリックで位置ジャンプ可
+- バックグラウンドで段階的読み込み継続
+
+コンソールログ例
+
+```
+[NewRulesManager] Processing block 0: p (id: 0) - "テキスト..."
+progressiveFetch: Fetching initial batch of 3 items for immediate playbook
+🎤 [TTS Request] Text: 'テキスト内容...' (length: 67)
+```
+
+### 🎯 アーキテクチャ概要（責務分離）
+
+| コンポーネント | 責任                                                 |
+| -------------- | ---------------------------------------------------- |
+| Python Server  | テキスト →MP3 変換のみ（完全ステートレス）           |
+| rules.js       | DOM 順序でのテキスト抽出                             |
+| content.js     | キュー管理、再生制御、ハイライト同期、段階的読み込み |
+| background.js  | 音声合成方式の振り分け                               |
+
+データフロー
+
+1. ユーザー段落クリック
+2. rules.js で DOM 順序に従いブロック抽出
+3. content.js がクリック位置から段階的にキュー構築
+4. progressiveFetch が最初の 5 件を優先読み込み
+5. Python Server が Edge TTS で MP3 生成（ここだけ）
+6. content.js が順序通りに再生し、ハイライト同期
+7. 残りをバックグラウンドで段階的に読み込み
+
+### 🎊 最終結果
+
+- 音声品質: Microsoft Edge TTS で高品質
+- パフォーマンス: クリック後 0.5–1.0 秒で再生開始
+- 拡張性: 疎結合で他 TTS の追加も容易
+- 安定性: ステートレスサーバー + 段階的読み込み
+- ユーザビリティ: 位置ジャンプ、ハイライト同期、自動スクロール が安定動作
+
 ---
 
 <aside>

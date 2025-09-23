@@ -60,6 +60,49 @@ class TestSynthesizer extends AudioSynthesizer {
   }
 }
 
+// Edge TTS実装（Python TTS Serverを使用）
+class EdgeTTSSynthesizer extends AudioSynthesizer {
+  constructor(serverUrl = "http://localhost:8001") {
+    super();
+    this.serverUrl = serverUrl;
+  }
+
+  async synthesize(text) {
+    console.log(`[EdgeTTSSynthesizer] Synthesizing: "${text}"`);
+
+    try {
+      const cleanedText = cleanText(text);
+
+      const response = await fetch(`${this.serverUrl}/synthesize/simple`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: cleanedText,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Edge TTS Server error: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const blob = await response.blob();
+
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error(`[EdgeTTSSynthesizer] Error:`, error);
+      throw new Error(`Edge TTS synthesis failed: ${error.message}`);
+    }
+  }
+}
+
 // 音声合成ファクトリー
 class SynthesizerFactory {
   static create(type) {
@@ -68,6 +111,8 @@ class SynthesizerFactory {
         return new GoogleTTSSynthesizer();
       case "test":
         return new TestSynthesizer();
+      case "edge_tts":
+        return new EdgeTTSSynthesizer();
       default:
         throw new Error(`Unknown synthesizer type: ${type}`);
     }
