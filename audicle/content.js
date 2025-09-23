@@ -433,19 +433,20 @@ function buildQueueWithNewRulesManager() {
       blockIndex: index,
       element: element,
       status: "ready",
+      paragraphId: item.id || index, // item.idを優先、なければindexを使用
     };
   });
 
   const info = {
-    rule: extraction.rule.id,
-    priority: extraction.rule.priority,
-    type: extraction.rule.type,
+    rule: rule.id,
+    priority: rule.priority,
+    type: rule.type,
     domain: hostname,
     queueLength: queue.length,
   };
 
   console.log(
-    `[NewRulesManager] Successfully built queue: ${queue.length} items using rule '${extraction.rule.id}'`
+    `[NewRulesManager] Successfully built queue: ${queue.length} items using rule '${rule.id}'`
   );
 
   return { queue, info };
@@ -533,11 +534,20 @@ function getCurrentPageRuleInfo() {
   // Readability利用可能性
   ruleInfo.readabilityAvailable = typeof window.Readability !== "undefined";
 
+  console.log("[\ud83d\udd0d Page Rule Info]", ruleInfo);
   return ruleInfo;
+}
+
+// 即座にグローバル公開（関数定義直後）
+if (typeof window !== "undefined") {
+  window.getCurrentPageRuleInfo = getCurrentPageRuleInfo;
 }
 
 // 初期化時に現在のページのルール情報を表示
 document.addEventListener("DOMContentLoaded", () => {
+  // グローバル関数として公開（確実に実行されるタイミング）
+  window.getCurrentPageRuleInfo = getCurrentPageRuleInfo;
+
   // システム状態をログ出力
   console.log("[🚀 Audicle Initialized]");
   console.log(

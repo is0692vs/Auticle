@@ -1,64 +1,6 @@
 # Audicle
 
-Audicle（Article + Audio）は、ウェブページ上の記事コンテンツを音声で読み上げる ## 📂 ディレクトリ構造
-
-```text
-auticle/
-├── background.js         # 音声データ取得・音声合成モジュール
-├── content.js     ### 6. デバッグのヒント
-
-- **Console ログ確認**: `[🎯 Extraction Result]` でどのルールが採用されたかを確認
-- **抽出結果の検証**: `getCurrentPageRuleInfo()` をConsoleで実行
-- **複数ルール競合時**: `priority` の値で採用優先度が決定される
-
-## 🧪 テスト方法
-
-### 基本動作テスト
-
-1. **Chrome拡張機能の更新**
-   ```
-   chrome://extensions/ でAudicle拡張機能の「更新」ボタンをクリック
-   ```
-
-2. **テストページでの確認**
-   - `test/test.html` を開いて基本機能をテスト
-   - 段落をクリックして音声再生・ハイライト機能を確認
-
-3. **Qiitaページでの確認** 
-   - 任意のQiita記事を開く
-   - Consoleで以下のログを確認:
-     ```
-     [ExtractionRules] Found site-specific rule: qiita-custom
-     [NewRulesManager] Using rule: qiita-custom (site-specific, priority: 1000)
-     [🎯 Extraction Result] Rule: qiita-custom, Blocks: XX, Domain: qiita.com
-     ```
-
-4. **新ルール管理システムの動作確認**
-   - Consoleで `getCurrentPageRuleInfo()` を実行
-   - 現在のページで採用されるルール情報を確認
-
-### デバッグ用コマンド
-
-```javascript
-// 現在のページのルール情報表示
-getCurrentPageRuleInfo()
-
-// ルール管理システムのデバッグ情報取得（開発者向け）
-new ExtractionRulesManager().getDebugInfo()
-```  # ページ操作、再生キュー、ハイライト管理
-├── config.json           # 音声合成方式設定
-├── images/               # アイコン画像
-│   ├── icon16.png
-│   ├── icon48.png
-│   └── icon128.png
-├── lib/
-│   └── Readability.js    # 本文抽出ライブラリ
-├── manifest.json         # 拡張機能の定義ファイル
-├── popup.css             # ポップアップのスタイル
-├── popup.html            # ポップアップのUI
-├── popup.js              # ポップアップの動作
-└── styles.css            # ページに注入されるハイライト用スタイル
-```
+Audicle（Article + Audio）は、ウェブページ上の記事コンテンツを音声で読み上げる Chrome 拡張機能です。
 
 クリックした段落から、記事の最後までをインテリジェントに読み上げ、再生箇所をハイライトすることで、快適な「ながら読書」体験を提供します。
 
@@ -75,13 +17,13 @@ new ExtractionRulesManager().getDebugInfo()
 
 ## 📖 使い方
 
-1.  **インストール**: `chrome://extensions` ページで「パッケージ化されていない拡張機能を読み込む」を選択し、**`audicle`ディレクトリのみ** を読み込みます。
-2.  **有効化**: 読み上げたい記事ページを開き、ブラウザのツールバーにある Audicle アイコンをクリック。ポップアップ内の「読み上げモード」トグルスイッチを ON にします。
-3.  **再生**: ページ上のハイライト可能になった段落をクリックすると、その位置から 2.0 倍速での読み上げが開始されます。
-4.  **操作**:
-    - **再生位置の変更**: 別の段落をクリックすると、再生が即座にその位置へ移動します。
-    - **一時停止/再開**: ポップアップの「一時停止」ボタンで再生を止め、「再開」ボタンで続きから再生できます。
-    - **完全停止**: 「読み上げモード」のトグルスイッチを OFF にすると、再生が完全に停止し、ハイライトも解除されます。
+1. **インストール**: `chrome://extensions` ページで「パッケージ化されていない拡張機能を読み込む」を選択し、**`audicle`ディレクトリのみ** を読み込みます。
+2. **有効化**: 読み上げたい記事ページを開き、ブラウザのツールバーにある Audicle アイコンをクリック。ポップアップ内の「読み上げモード」トグルスイッチを ON にします。
+3. **再生**: ページ上のハイライト可能になった段落をクリックすると、その位置から 2.0 倍速での読み上げが開始されます。
+4. **操作**:
+   - **再生位置の変更**: 別の段落をクリックすると、再生が即座にその位置へ移動します。
+   - **一時停止/再開**: ポップアップの「一時停止」ボタンで再生を止め、「再開」ボタンで続きから再生できます。
+   - **完全停止**: 「読み上げモード」のトグルスイッチを OFF にすると、再生が完全に停止し、ハイライトも解除されます。
 
 ## 🛠️ アーキテクチャ概要
 
@@ -126,6 +68,9 @@ SynthesizerFactory.create(config.synthesizerType)
 audicle/
 ├── background.js         # 音声データ取得
 ├── content.js            # ページ操作、再生キュー、ハイライト管理
+├── config.json           # 音声合成方式設定
+├── content-extract/      # コンテンツ抽出ルール管理
+│   └── rules.js          # サイト別抽出ルール定義
 ├── images/               # アイコン画像
 │   ├── icon16.png
 │   ├── icon48.png
@@ -146,9 +91,39 @@ audicle/
 - **再生速度**: 現在は固定でベタ打ちで `audioPlayer.playbackRate` に設定しています．等倍速がかなり遅いため，2.0 倍速にしています．
 - **音声合成方式**: `auticle/config.json` の `synthesizerType` で音声合成エンジンを指定できます（現在は `"google_tts"` のみ対応）。設定変更後は拡張機能のリロードが必要です。
 
+## 🧪 テスト方法
+
+### 基本動作テスト
+
+1. **Chrome 拡張機能の更新**
+
+   `chrome://extensions/` で Audicle 拡張機能の「更新」ボタンをクリック
+
+2. **テストページでの確認**
+
+   - `test/test.html` を開いて基本機能をテスト
+   - 段落をクリックして音声再生・ハイライト機能を確認
+
+3. **Qiita ページでの確認**
+
+   - 任意の Qiita 記事を開く
+   - Console で以下のログを確認:
+
+     ```text
+     [ExtractionRules] Found site-specific rule: qiita-custom
+     [NewRulesManager] Using rule: qiita-custom (site-specific, priority: 1000)
+     [🎯 Extraction Result] Rule: qiita-custom, Blocks: XX, Domain: qiita.com
+     ```
+
+4. **新ルール管理システムの動作確認**
+   - Console で新ルール管理システムのログを確認
+   - 現在のページで採用されるルール情報を確認
+
 ## 🔧 開発者向け - 新サイト対応ルール追加手順
 
 特定のサイトに最適化された抽出ルールを追加する場合の手順：
+
+> **📋 詳細ガイド**: より詳しい情報は `audicle/content-extract/RULE_ADDITION_GUIDE.md` を参照してください。
 
 ### 1. ルール定義ファイルの編集
 
@@ -174,6 +149,7 @@ const SITE_SPECIFIC_RULES = {
 2. **Developer Tools (F12) で要素を検査**
 3. **本文部分の CSS セレクターを特定**
 4. **Console で動作確認**:
+
    ```javascript
    // セレクターのテスト
    document.querySelectorAll("your-selector-here");
