@@ -328,184 +328,66 @@ Mozilla Readability.js を導入し、メインコンテンツ自動特定と構
 
 ---
 
-### Issue #20: [Refactor] 音声合成モジュールの疎結合化
-
-- 担当者: [Developer Name]
-- マイルストーン: 2. 中核となる読み上げ機能の実装（音声合成の疎結合化）
-- 背景: 将来的な音声合成エンジンの追加・変更を容易にするため、音声合成ロジックを独立したモジュールとして切り出し、設定ファイルで方式を指定可能にする。
-- 実装方針
-  1. 音声合成基底クラス・ファクトリーパターンの導入
-     - `AudioSynthesizer` 基底クラス：`synthesize(text)` メソッドでテキスト → 音声データ URL 返却の統一インターフェースを定義
-     - `GoogleTTSSynthesizer` 実装クラス：Google 翻訳 TTS を利用した音声合成処理
-     - `SynthesizerFactory` ファクトリクラス：設定に基づいて適切なシンセサイザーインスタンスを生成
-  2. 設定ベース方式選択
-     - `config.json` 新規作成：`{"synthesizerType": "google_tts"}` で使用方式を指定
-     - `manifest.json` 更新：`web_accessible_resources` に config.json を追加
-  3. 責務分離
-     - 音声合成モジュール：「テキスト → 音声データ URL 返却」のみを責務とし、バッチ処理や先読みは呼び出し側（background.js）の責任
-     - 設定変更：popup 等での動的切替は不要、拡張機能リロードで反映
-
-### アーキテクチャ・データやり取り構造
-
-#### 1. モジュール構成
-
-```text
-background.js
-├── AudioSynthesizer (基底クラス)
-│   └── synthesize(text): Promise<string> // 音声データURLを返却
-├── GoogleTTSSynthesizer (実装クラス)
-│   └── synthesize(text): Promise<string> // Google翻訳TTS利用
-└── SynthesizerFactory (ファクトリクラス)
-    └── create(type): AudioSynthesizer // 設定に基づいてインスタンス生成
-
-config.json
-├── synthesizerType: string // "google_tts" 等の方式指定
-
-content.js
-├── audioErrorハンドリング追加
-└── リトライ・スキップ処理
-```
-
-#### 2. データフロー
-
-```text
-1. 拡張機能起動
-   background.js → config.json読込 → SynthesizerFactory.create() → インスタンス生成
-
-2. 音声再生リクエスト
-   content.js → background.js: { command: 'play'/'fetch', text, ... }
-   background.js → synthesizer.synthesize(text) → 音声データURL生成
-   background.js → content.js: { command: 'audio', url: 'data:audio/mp3;...' }
-   content.js → audio要素で再生・エラーハンドリング
-
-3. 設定変更
-   config.json編集 → 拡張機能リロード → 新しい方式で動作
-```
-
-#### 3. 拡張ポイント（将来）
-
-新しい音声合成方式の追加手順：
-
-1. `AudioSynthesizer` を継承した新クラスを作成（例：`AzureTTSSynthesizer`）
-2. `SynthesizerFactory.create()` に新方式の分岐を追加
-3. `config.json` の `synthesizerType` を新方式に変更
-4. 拡張機能リロード
-
-#### 4. インターフェース仕様
-
-```javascript
-// 音声合成基底クラス
-class AudioSynthesizer {
-  async synthesize(text) {
-    // テキスト → 音声データURL（data:audio/mp3;base64,...）
-    throw new Error("Must be implemented by subclass");
-  }
-}
-
-// Google TTS実装
-class GoogleTTSSynthesizer extends AudioSynthesizer {
-  async synthesize(text) {
-    // Google翻訳TTSエンドポイントでMP3取得 → data URL変換
-    const response = await fetch(
-      `https://translate.google.com/translate_tts?...`
-    );
-    const arrayBuffer = await response.arrayBuffer();
-    return `data:audio/mp3;base64,${btoa(
-      String.fromCharCode(...new Uint8Array(arrayBuffer))
-    )}`;
-  }
-}
-
-// ファクトリ
-class SynthesizerFactory {
-  static async create(type) {
-    switch (type) {
-      case "google_tts":
-        return new GoogleTTSSynthesizer();
-      default:
-        throw new Error(`Unknown synthesizer type: ${type}`);
-    }
-  }
-}
-```
-
-- [x] 完了条件
-  - [x] Google TTS による音声再生が従来と同じように動作する
-  - [x] `config.json` で音声合成方式を指定できる
-  - [x] 音声合成ロジックが独立したモジュールとして疎結合化されている
-  - [x] 将来の音声合成エンジン追加が容易な構造になっている
-  - [x] content.js で audio エラー時のリトライ・スキップ処理が実装されている
-
-> 🔧 変更履歴: Google TTS の音声合成ロジックを疎結合モジュールとして分離し、設定ベース方式選択とファクトリパターンを導入しました。将来の拡張性を確保しつつ、既存機能を完全に維持しています。
-
----
-
 ### Issue #9: [Feature] 視覚的なフィードバック
 
 ### Issue #10: [Enhancement/Refactoring] 音声合成方式の切替対応
 
-### やったことまとめ
-
-- 戦略パターンで方式切替を実装（Google 翻訳 TTS／Web Speech API／外部 API ダミー）
-- 抽象層を導入：`AudioSynthesizer` 基底クラスと `SynthesizerFactory` で生成を一元化
-- 設定管理：`config.json` に `synthesizerType` と各種パラメータを定義。`manifest.json` で参照可能に
-- UI 連携：popup ドロップダウンで方式選択し、[`chrome.storage`](http://chrome.storage) に永続化
-- 主要変更：
-  - `background.js` 方式分岐と統合合成関数、バッチ処理の更新
-  - `content.js` `audioError` メッセージハンドリング追加
-  - `popup.html` / `popup.js` 方式選択 UI と設定連携
-- 既存機能（連続再生、プリフェッチ、バッチ）を維持しつつエラーハンドリングを強化
-
-### テスト
-
-- 拡張読込：chrome://extensions → 開発者モード → パッケージ化されていない拡張機能で `auticle/` を選択
-- 基本動作：popup で方式選択 → 読み上げモード ON → 記事段落をクリック → 選択方式で再生される
-- 方式切替：Google 翻訳 TTS で確認 → ブラウザ標準へ切替 → 同一箇所で音声差分を確認 → リロード後も選択保持
-- 設定反映：`config.json` で外部 API を `enabled: true` → 拡張再読込 → popup に選択肢が出る → 選択時は適切にエラー表示（ダミー）
-- 異常値検証：`synthesizerType` を無効値に → 再読込でコンソールにエラーが出る → `google_tts` に戻すと復旧
-- デバッグログ確認：DevTools に「設定読み込み完了」「音声合成方法: …」「音声合成方法を … に変更しました」等が出力される
 - GitHub: [リンク](https://github.com/is0692vs/Audicle/issues/28)
 - Labels: `enhancement`, `refactoring`
 - マイルストーン: 3. UI/UX の改善と仕上げ
+- 背景（要約）
+- 音声合成が Google 翻訳 TTS に直結しており拡張性が低い
+- 将来の Azure TTS / Amazon Polly 等への切替・追加に備える
+- Web Speech API は不安定のため採用しない方針
+- 既存の Google TTS の体験は維持したい
+- 実装方針（決定）
+- 責務分離: 「テキスト → 音声データ URL」を返すモジュールに限定
+- 設定ベース切替: config.json の synthesizerType で方式を指定（UI での動的切替はしない）
+- 反映方法: 設定変更時は拡張機能のリロードで反映
+- 連続再生や先読みは呼び出し側（既存ロジック）が担当
+- やったこと（実装）
+- AudioSynthesizer 抽象化と GoogleTTSSynthesizer 実装
+- SynthesizerFactory を追加し config.json に基づきインスタンス生成
+- background.js を新構成へ適合（play/fetch ルートの委譲）
+- content.js に audio 再生エラーのハンドリングとリトライ・スキップ追加
+- manifest.json に config.json を web_accessible_resources 登録
+- ドキュメント更新: [ROADMAP.md](http://ROADMAP.md), [README.md](http://README.md), [audio-synthesis-refactor-summary.md](http://audio-synthesis-refactor-summary.md)
+- テスト（抜粋）
+- 基本: 拡張を更新 → 読み上げ ON → 段落クリック → Google TTS で再生されること
+- 設定: config.json の synthesizerType を不正値に変更 → リロード → エラー確認 → 正常値復帰で正常動作
+- エラー耐性: ネットワーク遮断で再生 → リトライログ → 最大リトライ後はスキップ
+- 疎結合性: background.js のレビューで合成ロジック分離を確認、将来エンジン追加の容易さを確認
+- [x] 既存の Google TTS 体験を維持
+- [x] 合成モジュールの疎結合化と設定ベース切替
+- [x] エラー時のリトライ・スキップ強化
 
-### 背景
+### テストモジュール（TestSynthesizer）
 
-- 音声合成が単一実装に依存。将来のエンジン追加やユーザー選択の提供が困難。
+- 目的: 方式切替の実機テストを容易にする固定音源リターン実装
+- 実装: `TestSynthesizer` を追加し常に [`sample.mp](http://sample.mp)3` を返却。`SynthesizerFactory`に`test` を追加
+- 設定: `config.json` の `{"synthesizerType":"test"}` で有効化。反映は拡張リロード
+- マニフェスト: `web_accessible_resources` に [`sample.mp](http://sample.mp)3` を追加
+- ドキュメント: [`sample.mp3.md`](http://sample.mp3.md) を追加し設置とテスト手順を説明
+- テスト手順（ショート）
 
-### 実装方針
+1. [`sample.mp](http://sample.mp)3` を配置
 
-- `SpeechSynthesizer` インターフェースを定義: `speak(text)`, `stop()`, `getState()`
-- 具象クラスを実装: `BrowserSpeechSynthesizer`, `ApiSpeechSynthesizer`（例: http://localhost:8000/synthesize`）にリクエストを送信し、返された音声データを再生するクラス。
-  3）
-- 設定 UI で方式を選択。選択値を永続化し、起動時に該当実装を生成して利用
+2. `config.json` を `test` に変更 → 拡張を更新
 
-### 受け入れ条件
+3. 段落クリックで [`sample.mp](http://sample.mp)3`が再生され、コンソールに`[TestSynthesizer] ... returning [sample.mp](http://sample.mp)3` が出る
 
-- 設定 UI から方式を選べる
-- ブラウザ標準と外部 API の 2 方式で切替でき、選択方式で再生される
-- 選択がリロード後も保持される
-- 呼び出し側はインターフェース経由で動作する
+4. `google_tts` に戻して従来動作を確認
 
-### タスク
+- [x] `test` 設定時は常に [`sample.mp](http://sample.mp)3` が再生
+- [x] 設定変更は拡張リロードで即時反映
+- [x] 既存の連続再生・ハイライト・一時停止が両方式で維持
 
-- インターフェース定義
-- Browser 実装
-- API 実装
-- 設定 UI と永続化
-- 選択に応じたインスタンス切替
-- GitHub: [#9](https://github.com/is0692vs/Auticle/issues/9)
-- 担当者: [Developer Name]
-- マイルストーン: 3. UI/UX の改善と仕上げ
-- 背景: 再生中かどうかを Popup を開かずとも把握できるようにする。
-- 実装方針
-  1. `background.js`:
-     - `chrome.action` API を利用。
-     - 再生開始（`speak()` 呼び出し）時に `chrome.action.setIcon({ path: 'images/icon-active.png' })` を実行。
-     - 停止・完了・エラー（`stop` 受信時, `onend`, `onerror`）時に `chrome.action.setIcon({ path: 'images/icon-default.png' })` を実行。
-     - 代替案: `chrome.action.setBadgeText` で「ON」などのバッジ表示も検討。
-- [ ] 完了条件
-  - [ ] 再生中は拡張機能アイコンが通常と異なるデザインになること。
-  - [ ] 停止または完了でアイコンが元に戻ること。
+<aside>
+🔎
+
+将来追加手順の想定: `AzureTTSSynthesizer` を実装 → Factory に case を追加 → `{"synthesizerType":"azure_tts"}` で切替。
+
+</aside>
 
 ---
 
