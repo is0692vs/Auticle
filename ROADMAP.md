@@ -631,6 +631,111 @@ progressiveFetch: Fetching initial batch of 3 items for immediate playbook
 
 ---
 
+### 新しい作業: Docker 版 Edge TTS オプションの追加（完了）
+
+- GitHub: [リンク](https://github.com/is0692vs/Audicle/issues/35)
+
+### 🎯 目的・ゴール
+
+1. LAN 内共有で Audicle の音声合成を複数端末から利用可能にする
+2. Docker 化で環境差を排除し安定デプロイを実現
+3. 設定の簡素化: config.json はエンジン選択のみに集約
+4. 疎結合維持: 既存アーキテクチャを崩さない独立オプション
+
+### 🔧 実装内容
+
+1. Docker 版 Edge TTS サーバー（docker-tts-server）
+
+```
+docker-tts-server/
+├── Dockerfile               # Python 3.11-slim ベース
+├── docker-compose.yml       # サービス定義とネットワーク
+├── [server.py](http://server.py)                # FastAPI 音声合成サーバー
+├── requirements.txt         # Python 依存
+├── .env                     # 環境変数（ポート・ホスト・音声設定）
+└── [README.md](http://README.md)                # Docker 版ドキュメント
+```
+
+- Microsoft Edge TTS で高品質合成
+- 0.0.0.0 バインドで LAN アクセスに対応
+- ヘルスチェックとログ出力
+- 既存 API 仕様と完全互換
+- 起動: `cd docker-tts-server && docker-compose up -d`
+
+2. Chrome 拡張の音声合成モジュール
+
+- 新クラス: `EdgeTTSDockerSynthesizer`
+- 固定エンドポイント: [`http://localhost:8001`](http://localhost:8001)
+- 設定引数不要、既存 API と互換
+- Factory 追加:
+
+```jsx
+case "edge_tts_docker":
+  return new EdgeTTSDockerSynthesizer();
+```
+
+3. 設定管理の簡素化
+
+- config.json（固定）:
+
+```json
+{ "synthesizerType": "edge_tts_docker" }
+```
+
+- 対話的設定スクリプト（configure\_[audicle.sh](http://audicle.sh)）を削除
+- Docker 側の設定は .env に集約
+
+4. 環境変数管理（.env）
+
+```
+TTS_HOST_PORT=8001
+TTS_HOST_IP=0.0.0.0
+DEFAULT_VOICE=ja-JP-NanamiNeural
+COMPOSE_PROJECT_NAME=audicle-edge-tts
+```
+
+- すべてのサーバー設定は Docker 側で完結
+- README を更新し環境変数管理を明記
+- AUDIO*SYNTHESIS*[MODULES.md](http://MODULES.md) とメイン README のスクリプト記述を削除
+
+5. ドキュメント更新
+
+- AUDIO*SYNTHESIS*[MODULES.md](http://MODULES.md): Docker 版設定を記載、古い手順を削除
+- [README.md](http://README.md): 起動・テスト・運用ガイドを統合
+
+### 🧪 テスト項目
+
+- 基本機能
+  1. Docker 起動: `docker-compose up -d`
+     - コンテナ起動とヘルスチェック成功
+  2. API 動作: `curl` による疎通と MP3 生成確認
+     - GET: http://localhost:8001/>
+     - POST: http://localhost:8001/synthesize/simple>
+  3. 拡張統合: config.json を `edge_tts_docker` に設定しリロード
+     - クリックで音声再生が開始
+- 設定簡素化
+  - config.json に余分なパラメータがない
+  - Docker 設定が .env に集約
+- LAN アクセス
+  - 0.0.0.0 バインドで同一ネットワーク端末からアクセス可能
+  - .env のポート変更で動作切替可
+
+### 🎯 設計原則と運用改善
+
+- 責務分離: Docker サーバーは「テキスト → 音声」のみ。拡張側でキュー・ハイライト管理
+- 設定の一元化: config.json は方式選択のみ、詳細は .env
+- 独立性: 既存 `edge_tts` は残し、`edge_tts_docker` を独立実装
+- 起動の標準化: `docker-compose up -d` のみで稼働
+- 不要スクリプト削除で保守性向上（configure\_[audicle.sh](http://audicle.sh) 等）
+
+### 🎊 最終結果
+
+- シンプルな導入と運用で高品質 Edge TTS を LAN 共有可能に
+- 環境変数ベースの明快な設定で誤設定を削減
+- 既存拡張との疎結合を保ち、将来の拡張にも容易に対応
+
+---
+
 <aside>
 📝
 

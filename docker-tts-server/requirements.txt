@@ -1,0 +1,5 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+edge-tts==6.1.7
+pydantic==2.4.2
+requests==2.31.0
