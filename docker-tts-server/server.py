@@ -20,7 +20,6 @@ class SynthesizeRequest(BaseModel):
     text: str
     voice: Optional[str] = "ja-JP-NanamiNeural"  # デフォルトは日本語の女性音声
     rate: Optional[str] = "+0%"  # 話速 (+50%, -25%など)
-    pitch: Optional[str] = "+0Hz"  # 音の高さ
 
 class HealthResponse(BaseModel):
     status: str
@@ -65,12 +64,11 @@ async def synthesize_text(request: SynthesizeRequest):
         if not request.text.strip():
             raise HTTPException(status_code=400, detail="テキストが空です")
         
-        # Edge TTSで音声合成
+        # Edge TTSで音声合成（pitch パラメータを削除）
         communicate = edge_tts.Communicate(
             request.text, 
             request.voice, 
-            rate=request.rate,
-            pitch=request.pitch
+            rate=request.rate
         )
         
         # 一時ファイルに保存

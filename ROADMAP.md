@@ -631,7 +631,7 @@ progressiveFetch: Fetching initial batch of 3 items for immediate playbook
 
 ---
 
-### 新しい作業: Docker 版 Edge TTS オプションの追加（完了）
+## Docker 版 Edge TTS オプションの追加（完了）
 
 - GitHub: [リンク](https://github.com/is0692vs/Audicle/issues/35)
 
@@ -733,6 +733,42 @@ COMPOSE_PROJECT_NAME=audicle-edge-tts
 - シンプルな導入と運用で高品質 Edge TTS を LAN 共有可能に
 - 環境変数ベースの明快な設定で誤設定を削減
 - 既存拡張との疎結合を保ち、将来の拡張にも容易に対応
+
+### 📋 修正した問題と解決策（追記）
+
+🚨 発見した問題
+
+1. edge-tts ライブラリのバージョン問題（古い版で pitch が未サポート）
+2. 認証エラー（Microsoft Edge TTS 接続で 403）
+
+✅ 実施した修正
+
+1. pitch パラメータの完全削除
+   - SynthesizeRequest クラスと `edge_tts.Communicate()` 呼び出しから `pitch` を除去
+2. edge-tts ライブラリ更新
+   - 6.1.7 → >= 6.1.12 へ更新し最新の認証方式に対応
+3. 環境変数の整理
+   - .env から `DEFAULT_PITCH` を削除（設定源を一本化）
+
+### 🧪 テスト結果（追記）
+
+- Docker TTS サーバーが正常に 13KB の MP3 を生成
+- 「テスト音声です」の入力で MPEG ADTS Layer III 形式の出力を確認
+- サーバーログにてリクエスト受信と正常レスポンスを確認
+
+### ▶ 次のステップ（運用手順）
+
+1. Chrome 拡張機能をリロード
+
+- chrome://extensions → Audicle → 更新
+
+2. テストページで動作確認
+
+- Qiita 記事で段落クリック → 音声再生・ハイライト同期を確認
+
+3. Docker サーバーログ確認
+
+- リクエストが到達していること、エラーが出ていないことを確認
 
 ---
 
