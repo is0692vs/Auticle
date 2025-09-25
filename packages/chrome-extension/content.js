@@ -24,6 +24,112 @@ const BATCH_SIZE = 3;
 // テキスト分割設定
 const CHUNK_SIZE = 200; // 200文字ごとに分割（0にすると分割なし）
 
+// **レート制限関連の追加変数**
+let lastRequestTime = 0; // 最後のリクエスト時刻
+const REQUEST_COOLDOWN = 500; // 0.5秒のクールタイム（ミリ秒）
+let requestQueue = []; // 待機中のリクエストキュー
+let isProcessingRequests = false; // リクエスト処理中フラグ
+
+// **レート制限管理関数**
+function addToRequestQueue(requestData, callback) {
+  requestQueue.push({ requestData, callback });
+  console.log(
+    `[Rate Limit] Added request to queue. Queue length: ${requestQueue.length}`
+  );
+  processRequestQueue();
+}
+
+function processRequestQueue() {
+  if (isProcessingRequests || requestQueue.length === 0) {
+    return;
+  }
+
+  isProcessingRequests = true;
+
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastRequestTime;
+  const waitTime = Math.max(0, REQUEST_COOLDOWN - timeSinceLastRequest);
+
+  setTimeout(() => {
+    if (requestQueue.length > 0) {
+      const { requestData, callback } = requestQueue.shift();
+      lastRequestTime = Date.now();
+
+      console.log(
+        `[Rate Limit] Processing request. Remaining in queue: ${requestQueue.length}`
+      );
+
+      // 実際のリクエスト送信
+      chrome.runtime.sendMessage(requestData, (response) => {
+        callback(response);
+        isProcessingRequests = false;
+        // 次のリクエストを処理
+        setTimeout(() => processRequestQueue(), 10);
+      });
+    } else {
+      isProcessingRequests = false;
+    }
+  }, waitTime);
+}
+
+// **順次音声合成リクエスト関数**
+function requestAudioSequentially(startIndex, endIndex, callback) {
+  console.log(
+    `[Sequential Request] Starting from index ${startIndex} to ${
+      endIndex || playbackQueue.length - 1
+    }`
+  );
+
+  const actualEndIndex = endIndex || playbackQueue.length - 1;
+  const requests = [];
+
+  // リクエストする項目を準備
+  for (let i = startIndex; i <= actualEndIndex; i++) {
+    if (!audioCache.has(i)) {
+      const item = playbackQueue[i];
+      if (item && item.text) {
+        requests.push({ index: i, text: item.text });
+      }
+    }
+  }
+
+  if (requests.length === 0) {
+    console.log(
+      `[Sequential Request] All items ${startIndex}-${actualEndIndex} already cached`
+    );
+    callback();
+    return;
+  }
+
+  console.log(`[Sequential Request] Queuing ${requests.length} requests`);
+  let completedRequests = 0;
+
+  // 各リクエストを順次キューに追加
+  requests.forEach((request, index) => {
+    const requestData = {
+      command: "fetch",
+      text: request.text,
+    };
+
+    addToRequestQueue(requestData, (response) => {
+      if (response && response.audioDataUrl) {
+        audioCache.set(request.index, response.audioDataUrl);
+        console.log(
+          `[Sequential Request] Cached audio for index: ${request.index}`
+        );
+      }
+
+      completedRequests++;
+      if (completedRequests === requests.length) {
+        console.log(
+          `[Sequential Request] Completed all ${requests.length} requests`
+        );
+        callback();
+      }
+    });
+  });
+}
+
 // ----- Readability 注入 & カスタムルール定義 -----
 // ドメインごとの独自抽出ルール（まずは qiita.com のプレースホルダ）
 const customRules = {
@@ -377,25 +483,35 @@ function handleClick(event) {
 
         if (jumpBatch.length > 0) {
           console.log(
-            `handleClick: Fetching ${jumpBatch.length} items from jump position`
+            `handleClick: Requesting ${jumpBatch.length} items from jump position using sequential requests`
           );
-          chrome.runtime.sendMessage(
-            { command: "fullBatchFetch", batch: jumpBatch },
-            (response) => {
-              if (response && response.audioDataUrls) {
-                response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
-                  audioCache.set(index, audioDataUrl);
-                });
-              }
+
+          // 新しいレート制限システムを使用してリクエスト
+          requestAudioSequentially(
+            bestIndex,
+            bestIndex + JUMP_BATCH_SIZE - 1,
+            () => {
               playQueue();
-              // バックグラウンドで残りを読み込み
-              fetchRemainingInBackground(bestIndex + JUMP_BATCH_SIZE);
+              // バックグラウンドで残りを読み込み（クリック位置より後の部分）
+              if (bestIndex + JUMP_BATCH_SIZE < playbackQueue.length) {
+                requestAudioSequentially(
+                  bestIndex + JUMP_BATCH_SIZE,
+                  null,
+                  () => {
+                    console.log("handleClick: Background loading completed");
+                  }
+                );
+              }
             }
           );
         } else {
           playQueue();
           // バックグラウンドで残りを読み込み
-          fetchRemainingInBackground(bestIndex + JUMP_BATCH_SIZE);
+          if (bestIndex + JUMP_BATCH_SIZE < playbackQueue.length) {
+            requestAudioSequentially(bestIndex + JUMP_BATCH_SIZE, null, () => {
+              console.log("handleClick: Background loading completed");
+            });
+          }
         }
       } else {
         console.warn(
@@ -1193,150 +1309,70 @@ function progressiveFetch(callback) {
   }
 
   console.log(
-    `progressiveFetch: Fetching initial batch of ${initialBatch.length} items for immediate playback`
+    `progressiveFetch: Starting sequential fetch of initial batch (${initialBatch.length} items) for immediate playback`
   );
 
-  // 最初のバッチを取得
-  chrome.runtime.sendMessage(
-    { command: "fullBatchFetch", batch: initialBatch },
-    (response) => {
-      if (response && response.audioDataUrls) {
-        console.log(
-          "progressiveFetch: Received",
-          response.audioDataUrls.length,
-          "initial audio URLs"
-        );
-        response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
-          audioCache.set(index, audioDataUrl);
-          console.log(
-            "progressiveFetch: Cached initial audio for index:",
-            index
-          );
-        });
-        console.log("progressiveFetch: Initial batch ready, starting playback");
-      } else {
-        console.error("progressiveFetch: No response for initial batch");
-      }
-
-      // 再生開始
+  // 最初のバッチを順次取得（レート制限対応）
+  requestAudioSequentially(
+    startIndex,
+    startIndex + INITIAL_BATCH_SIZE - 1,
+    () => {
+      console.log("progressiveFetch: Initial batch ready, starting playback");
       callback();
 
-      // バックグラウンドで残りを読み込み
-      fetchRemainingInBackground(startIndex + INITIAL_BATCH_SIZE);
+      // バックグラウンドで残りを順次読み込み（上から順番）
+      if (startIndex + INITIAL_BATCH_SIZE < playbackQueue.length) {
+        console.log("progressiveFetch: Starting background sequential loading");
+        requestAudioSequentially(startIndex + INITIAL_BATCH_SIZE, null, () => {
+          console.log("progressiveFetch: All background loading completed");
+        });
+      }
     }
   );
 }
 
-// バックグラウンドで残りの音声を読み込み（前後両方向）
+// バックグラウンドで残りの音声を読み込み（前後両方向、順次リクエスト）
 function fetchRemainingInBackground(priorityStartIndex) {
-  // 前方向（未来）と後方向（過去）に分けて収集
-  const forwardBatch = []; // クリック位置より後ろ（優先）
-  const backwardBatch = []; // クリック位置より前（後回し）
-
-  // 前方向（priorityStartIndex以降）を収集
+  // 前方向（priorityStartIndex以降）を優先で順次リクエストキューに追加
   for (let i = priorityStartIndex; i < playbackQueue.length; i++) {
     if (!audioCache.has(i)) {
       const item = playbackQueue[i];
       if (item && item.text) {
-        forwardBatch.push({ index: i, text: item.text });
+        addToRequestQueue({ index: i, text: item.text });
       }
     }
   }
 
-  // 後方向（queueIndexより前）を収集
+  // 後方向（queueIndexより前）を後回しでキューに追加
   for (let i = 0; i < queueIndex; i++) {
     if (!audioCache.has(i)) {
       const item = playbackQueue[i];
       if (item && item.text) {
-        backwardBatch.push({ index: i, text: item.text });
+        addToRequestQueue({ index: i, text: item.text });
       }
     }
   }
 
   console.log(
-    `fetchRemainingInBackground: Forward: ${forwardBatch.length} items, Backward: ${backwardBatch.length} items`
+    `fetchRemainingInBackground: Queued background loading from index ${priorityStartIndex}`
   );
-
-  // 前方向を最優先で読み込み
-  if (forwardBatch.length > 0) {
-    fetchBatchInChunks(forwardBatch, "forward", 0);
-  }
-
-  // 後方向は少し遅延させて読み込み
-  if (backwardBatch.length > 0) {
-    setTimeout(() => {
-      fetchBatchInChunks(backwardBatch, "backward", 2000); // 2秒遅延
-    }, 1000);
-  }
 }
 
-// バッチを小さなチャンクに分割して順次取得
-function fetchBatchInChunks(batch, direction, initialDelay = 0) {
-  const BACKGROUND_BATCH_SIZE = 8; // 少し小さく調整
-
-  for (let i = 0; i < batch.length; i += BACKGROUND_BATCH_SIZE) {
-    const chunk = batch.slice(i, i + BACKGROUND_BATCH_SIZE);
-
-    setTimeout(() => {
-      console.log(
-        `fetchBatchInChunks: Fetching ${direction} chunk ${
-          Math.floor(i / BACKGROUND_BATCH_SIZE) + 1
-        } (${chunk.length} items)`
-      );
-      chrome.runtime.sendMessage(
-        { command: "fullBatchFetch", batch: chunk },
-        (response) => {
-          if (response && response.audioDataUrls) {
-            response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
-              audioCache.set(index, audioDataUrl);
-              console.log(
-                `fetchBatchInChunks: Cached ${direction} audio for index:`,
-                index
-              );
-            });
-          }
-        }
-      );
-    }, initialDelay + i * 600); // 600ms間隔（少し短縮）
-  }
-}
-
+// 全体的なバッチ取得（必要に応じて順次リクエストに変更）
 function fullBatchFetch(callback) {
-  const batch = [];
+  console.log("fullBatchFetch: Starting full sequential loading");
+
+  // 全ての未キャッシュ項目を順次キューに追加
   for (let i = 0; i < playbackQueue.length; i++) {
     if (!audioCache.has(i)) {
       const item = playbackQueue[i];
       if (item && item.text) {
-        batch.push({ index: i, text: item.text });
+        addToRequestQueue({ index: i, text: item.text });
       }
     }
   }
-  if (batch.length === 0) {
-    console.log("fullBatchFetch: All items already cached");
-    callback(); // すべてキャッシュ済みなら即再生
-    return;
-  }
-  console.log("fullBatchFetch: Fetching", batch.length, "items in batch");
-  chrome.runtime.sendMessage(
-    { command: "fullBatchFetch", batch },
-    (response) => {
-      if (response && response.audioDataUrls) {
-        console.log(
-          "fullBatchFetch: Received",
-          response.audioDataUrls.length,
-          "audio URLs"
-        );
-        response.audioDataUrls.forEach(({ index, audioDataUrl }) => {
-          audioCache.set(index, audioDataUrl);
-          console.log("fullBatchFetch: Cached audio for index:", index);
-        });
-        console.log("fullBatchFetch: All audio cached, starting playback");
-      } else {
-        console.error("fullBatchFetch: No response or audioDataUrls");
-      }
-      callback();
-    }
-  );
+
+  if (callback) callback();
 }
 
 function injectStyles(filePath) {

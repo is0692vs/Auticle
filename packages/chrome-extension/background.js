@@ -148,6 +148,51 @@ class EdgeTTSDockerSynthesizer extends AudioSynthesizer {
   }
 }
 
+// API Server実装（新しいAPIサーバーを使用）
+class APIServerSynthesizer extends AudioSynthesizer {
+  constructor() {
+    super();
+    this.serverUrl = "http://localhost:8000";
+  }
+
+  async synthesize(text) {
+    console.log(`[APIServerSynthesizer] Synthesizing: "${text}"`);
+    console.log(`[APIServerSynthesizer] Server URL: ${this.serverUrl}`);
+
+    try {
+      const cleanedText = cleanText(text);
+
+      const response = await fetch(`${this.serverUrl}/synthesize`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: cleanedText,
+          voice: "ja-JP-NanamiNeural",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `API Server error: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const blob = await response.blob();
+
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error(`[APIServerSynthesizer] Error:`, error);
+      throw new Error(`API Server synthesis failed: ${error.message}`);
+    }
+  }
+}
+
 // 音声合成ファクトリー
 class SynthesizerFactory {
   static create(type) {
@@ -160,6 +205,8 @@ class SynthesizerFactory {
         return new EdgeTTSSynthesizer();
       case "edge_tts_docker":
         return new EdgeTTSDockerSynthesizer();
+      case "api_server":
+        return new APIServerSynthesizer();
       default:
         throw new Error(`Unknown synthesizer type: ${type}`);
     }

@@ -84,7 +84,7 @@ SynthesizerFactory.create(config.synthesizerType)
 - **一時停止/再開**: ポップアップの「一時停止」ボタンで再生を止め、「再開」ボタンで続きから再生できます。
 - **再生速度**: 現在は固定で 2.0 倍速に設定しています。等倍速がかなり遅いため、2.0 倍速にしています。
 - **音声合成方式**: `config.json` の `synthesizerType` で音声合成エンジンを指定できます。設定変更後は拡張機能のリロードが必要です。
-  - **利用可能なエンジン**: `google_tts`（デフォルト）, `test`, `edge_tts`, `edge_tts_docker`
+  - **利用可能なエンジン**: `google_tts`（デフォルト）, `test`, `edge_tts`, `edge_tts_docker`, `api_server`（新しい API サーバー）
 
 ## 🧪 テスト方法
 
@@ -113,6 +113,44 @@ SynthesizerFactory.create(config.synthesizerType)
 4. **新ルール管理システムの動作確認**
    - Console で新ルール管理システムのログを確認
    - 現在のページで採用されるルール情報を確認
+
+### API Server テスト
+
+新しい API サーバーを使用する場合の追加テスト手順：
+
+1. **API サーバー起動**
+
+   リポジトリのルートディレクトリで以下のコマンドを実行します。
+
+   ```bash
+   cd packages/api-server
+   docker-compose up -d
+   ```
+
+2. **設定変更**
+
+   `config.json` を手動編集：
+
+   ```json
+   {
+     "synthesizerType": "api_server"
+   }
+   ```
+
+3. **動作確認**
+
+   ```bash
+   curl http://localhost:8000/
+   ```
+
+4. **音声合成テスト**
+
+   ```bash
+   curl -X POST http://localhost:8000/synthesize \
+     -H "Content-Type: application/json" \
+     -d '{"text": "こんにちは", "voice": "ja-JP-NanamiNeural"}' \
+     --output test.mp3
+   ```
 
 ### Edge TTS Docker テスト
 

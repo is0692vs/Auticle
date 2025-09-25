@@ -631,7 +631,7 @@ progressiveFetch: Fetching initial batch of 3 items for immediate playbook
 
 ---
 
-## Docker 版 Edge TTS オプションの追加（完了）
+### 新しい作業: Docker 版 Edge TTS オプションの追加（完了）
 
 - GitHub: [リンク](https://github.com/is0692vs/Audicle/issues/35)
 
@@ -772,9 +772,148 @@ COMPOSE_PROJECT_NAME=audicle-edge-tts
 
 ---
 
+### 新しい作業: モノレポ構成への移行（完了レポート）
+
+### 🎯 目的
+
+- 将来の拡張性に備え、単一プロジェクトから複数パッケージを統合管理できるモノレポへ移行
+- コード再利用性の向上（共通ロジックや型の共有）
+- 一貫した開発体験（ビルド、テスト、リンティングの統一）
+- 依存関係の俯瞰と管理の簡素化
+- 新サービス（API サーバー等）の独立追加を容易に
+
+### 🔧 実施した作業
+
+1. ディレクトリ構造の再編成（git 履歴維持）
+
+- 旧構成（抜粋）
+
+```bash
+/ (repo root)
+├── audicle/
+├── docs/
+├── python-tts-server/
+└── ...
+```
+
+- 新構成（モノレポ）
+
+```bash
+/ (repo root)
+└── packages/
+    ├── chrome-extension/   # Chrome 拡張の全ソース
+    │   ├── audicle/
+    │   ├── docs/
+    │   ├── python-tts-server/
+    │   └── ...（既存ファイル一式）
+    └── api-server/         # 将来用（空）
+```
+
+- 実行コマンド（履歴保持のため git mv を使用）
+
+```bash
+mkdir -p packages/chrome-extension packages/api-server
+ls -A | grep -v '^\.' | grep -v '^packages$' | xargs -I{} git mv {} packages/chrome-extension/
+```
+
+2. ドキュメント更新（packages/chrome-extension/[README.md](http://README.md)）
+
+- 使い方（インストール手順）: 読み込みパスを audicle → packages/chrome-extension に修正
+- プロジェクト構造: 旧図を廃止し、モノレポ構成図に差し替え
+
+### 🧪 確認事項（運用観点）
+
+- 拡張機能のロード先が新ディレクトリで問題なく動作
+- 既存のビルドやテスト、リンタが新パスで実行可能
+- git 履歴が分断されていない（git log で追跡可能）
+
+### 🔭 今後の展望
+
+- API サーバー実装開始（packages/api-server）
+- 共通ライブラリ作成（テキスト処理、設定管理等の共有）
+- ビルドプロセス導入（lerna / npm workspaces）
+
 <aside>
-📝
+📦
+
+モノレポ移行により、パッケージ横断の変更や新規サービス追加が容易になります。まずは README と各種スクリプトの参照パスを順次モノレポ構成に追随させます。
+
+</aside>
 
 補足: 各 Issue の GitHub リンクから直接トラッキングできます。必要に応じて担当者名や追加項目を編集してください。
+
+---
+
+### 新しい作業: モノレポ構成への移行（完了レポート）
+
+https://github.com/is0692vs/Audicle/issues/38
+
+### 🎯 目的
+
+- 将来の拡張性に備え、単一プロジェクトから複数パッケージを統合管理できるモノレポへ移行
+- コード再利用性の向上（共通ロジックや型の共有）
+- 一貫した開発体験（ビルド、テスト、リンティングの統一）
+- 依存関係の俯瞰と管理の簡素化
+- 新サービス（API サーバー等）の独立追加を容易に
+
+### 🔧 実施した作業
+
+1. ディレクトリ構造の再編成（git 履歴維持）
+
+- 旧構成（抜粋）
+
+```bash
+/ (repo root)
+├── audicle/
+├── docs/
+├── python-tts-server/
+└── ...
+```
+
+- 新構成（モノレポ）
+
+```bash
+/ (repo root)
+└── packages/
+    ├── chrome-extension/   # Chrome 拡張の全ソース
+    │   ├── audicle/
+    │   ├── docs/
+    │   ├── python-tts-server/
+    │   └── ...（既存ファイル一式）
+    └── api-server/         # 将来用（空）
+```
+
+- 実行コマンド（履歴保持のため git mv を使用）
+
+```bash
+# モノレポ用のベースディレクトリを作成
+mkdir -p packages/chrome-extension packages/api-server
+# 隠しファイルと packages 自身を除外して移動
+ls -A | grep -v '^\.' | grep -v '^packages$' | xargs -I{} git mv {} packages/chrome-extension/
+```
+
+2. ドキュメント更新（packages/chrome-extension/[README.md](http://README.md)）
+
+- 使い方（インストール手順）
+  - 拡張の読み込みパスを audicle → packages/chrome-extension に修正
+- プロジェクト構造
+  - 旧図を廃止し、新しいモノレポ構成図に差し替え
+
+### 🧪 確認事項（運用観点）
+
+- 拡張機能のロード先が新ディレクトリで問題なく動作
+- 既存のビルドやテスト、リンタが新パスで実行可能
+- git 履歴が分断されていない（git log で追跡可能）
+
+### 🔭 今後の展望
+
+- API サーバー実装の開始（packages/api-server）
+- 共通ライブラリの作成（テキスト処理、設定管理等を共有パッケージ化）
+- ビルドプロセス導入（lerna や npm workspaces で依存解決とビルド自動化）
+
+<aside>
+📦
+
+モノレポ移行により、パッケージ横断の変更や新規サービス追加が容易になります。まずは README と各種スクリプトの参照パスを順次モノレポ構成に追随させます。
 
 </aside>
