@@ -71,13 +71,13 @@ SynthesizerFactory.create(config.synthesizerType)
 ```bash
 / (リポジトリルート)
 └── packages/
-    ├── chrome-extension/   # Chrome拡張機能の全ソースコード
-    │   ├── background.js
-    │   ├── content.js
-    │   ├── manifest.json
+    ├── chrome-extension/   # Chrome拡張機能と関連サーバーの全ソースコード
+    │   ├── audicle/            # 拡張機能本体
+    │   ├── python-tts-server/  # Python製TTSサーバー
+    │   ├── docker-tts-server/  # Docker版TTSサーバー
     │   └── ... (その他)
-    └── api-server/         # (将来利用予定の) APIサーバー
-        └── (空の状態)
+    └── api-server/         # (将来利用予定の) 新APIサーバー
+        └── .gitkeep          # (空の状態)
 ```
 
 ## ⚙️ 設定
