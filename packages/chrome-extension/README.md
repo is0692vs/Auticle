@@ -2,9 +2,9 @@
 
 Audicle（Article + Audio）は、ウェブページ上の記事コンテンツを音声で読み上げる Chrome 拡張機能です。
 
-クリックした段落から、記事- **音声合成方式**: `audicle/config.json` の `synthesizerType` で音声合成エンジンを指定できます。設定変更後は拡張機能のリロードが必要です。
+クリックした段落から、記事- **音声合成方式**: `config.json` の `synthesizerType` で音声合成エンジンを指定できます。設定変更後は拡張機能のリロードが必要です。
 
-> **📋 詳細ガイド**: 利用可能な音声合成モジュールの詳細は `audicle/AUDIO_SYNTHESIS_MODULES.md` を参照してください。最後までをインテリジェントに読み上げ、再生箇所をハイライトすることで、快適な「ながら読書」体験を提供します。
+> **📋 詳細ガイド**: 利用可能な音声合成モジュールの詳細は `AUDIO_SYNTHESIS_MODULES.md` を参照してください。最後までをインテリジェントに読み上げ、再生箇所をハイライトすることで、快適な「ながら読書」体験を提供します。
 
 ## ✨ 主な機能
 
@@ -71,11 +71,9 @@ SynthesizerFactory.create(config.synthesizerType)
 ```bash
 / (リポジトリルート)
 └── packages/
-    ├── chrome-extension/   # Chrome拡張機能と関連サーバーの全ソースコード
-    │   ├── audicle/            # 拡張機能本体
-    │   ├── python-tts-server/  # Python製TTSサーバー
-    │   ├── docker-tts-server/  # Docker版TTSサーバー
-    │   └── ... (その他)
+    ├── chrome-extension/   # Chrome拡張機能のソースコード
+    ├── python-tts-server/  # Python製TTSサーバー
+    ├── docker-tts-server/  # Docker版TTSサーバー
     └── api-server/         # (将来利用予定の) 新APIサーバー
         └── .gitkeep          # (空の状態)
 ```
@@ -85,7 +83,7 @@ SynthesizerFactory.create(config.synthesizerType)
 - **読み上げモード**: ポップアップのトグルスイッチで ON/OFF を切り替えます。OFF にすると、再生が完全に停止し、ハイライトも解除されます。
 - **一時停止/再開**: ポップアップの「一時停止」ボタンで再生を止め、「再開」ボタンで続きから再生できます。
 - **再生速度**: 現在は固定で 2.0 倍速に設定しています。等倍速がかなり遅いため、2.0 倍速にしています。
-- **音声合成方式**: `audicle/config.json` の `synthesizerType` で音声合成エンジンを指定できます。設定変更後は拡張機能のリロードが必要です。
+- **音声合成方式**: `config.json` の `synthesizerType` で音声合成エンジンを指定できます。設定変更後は拡張機能のリロードが必要です。
   - **利用可能なエンジン**: `google_tts`（デフォルト）, `test`, `edge_tts`, `edge_tts_docker`
 
 ## 🧪 テスト方法
@@ -98,12 +96,12 @@ SynthesizerFactory.create(config.synthesizerType)
 
 2. **テストページでの確認**
 
-   - `test/test.html` を開いて基本機能をテスト
+   - リポジトリ内の `packages/chrome-extension/test/test.html` をブラウザで開いて基本機能をテスト
    - 段落をクリックして音声再生・ハイライト機能を確認
 
 3. **Qiita ページでの確認**
 
-   - 任意の Qiita 記事を開く
+   - リポジトリ内の `packages/chrome-extension/test/qiitasample.html` をブラウザで開く
    - Console で以下のログを確認:
 
      ```text
@@ -122,14 +120,16 @@ Docker 版 Edge TTS を使用する場合の追加テスト手順：
 
 1. **Docker サーバー起動**
 
+   リポジトリのルートディレクトリで以下のコマンドを実行します。
+
    ```bash
-   cd docker-tts-server
+   cd packages/docker-tts-server
    docker-compose up -d
    ```
 
 2. **設定変更**
 
-   `audicle/config.json` を手動編集：
+   `config.json` を手動編集：
 
    ```json
    {
@@ -152,11 +152,11 @@ Docker 版 Edge TTS を使用する場合の追加テスト手順：
 
 特定のサイトに最適化された抽出ルールを追加する場合の手順：
 
-> **📋 詳細ガイド**: より詳しい情報は `audicle/content-extract/RULE_ADDITION_GUIDE.md` を参照してください。
+> **📋 詳細ガイド**: より詳しい情報は `content-extract/RULE_ADDITION_GUIDE.md` を参照してください。
 
 ### 1. ルール定義ファイルの編集
 
-`audicle/content-extract/rules.js` の `SITE_SPECIFIC_RULES` に新しいルールを追加：
+`content-extract/rules.js` の `SITE_SPECIFIC_RULES` に新しいルールを追加：
 
 ```javascript
 const SITE_SPECIFIC_RULES = {
