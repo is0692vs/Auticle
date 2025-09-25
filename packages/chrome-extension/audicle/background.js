@@ -103,6 +103,51 @@ class EdgeTTSSynthesizer extends AudioSynthesizer {
   }
 }
 
+// Docker Edge TTS実装（Docker化されたTTS Serverを使用）
+class EdgeTTSDockerSynthesizer extends AudioSynthesizer {
+  constructor() {
+    super();
+    // 固定設定：Docker環境はlocalhost:8001で統一
+    this.serverUrl = "http://localhost:8001";
+  }
+
+  async synthesize(text) {
+    console.log(`[EdgeTTSDockerSynthesizer] Synthesizing: "${text}"`);
+    console.log(`[EdgeTTSDockerSynthesizer] Server URL: ${this.serverUrl}`);
+
+    try {
+      const cleanedText = cleanText(text);
+
+      const response = await fetch(`${this.serverUrl}/synthesize/simple`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: cleanedText,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Docker Edge TTS Server error: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const blob = await response.blob();
+
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error(`[EdgeTTSDockerSynthesizer] Error:`, error);
+      throw new Error(`Docker Edge TTS synthesis failed: ${error.message}`);
+    }
+  }
+}
+
 // 音声合成ファクトリー
 class SynthesizerFactory {
   static create(type) {
@@ -113,6 +158,8 @@ class SynthesizerFactory {
         return new TestSynthesizer();
       case "edge_tts":
         return new EdgeTTSSynthesizer();
+      case "edge_tts_docker":
+        return new EdgeTTSDockerSynthesizer();
       default:
         throw new Error(`Unknown synthesizer type: ${type}`);
     }

@@ -84,8 +84,9 @@ SynthesizerFactory.create(config.synthesizerType)
 
 - **読み上げモード**: ポップアップのトグルスイッチで ON/OFF を切り替えます。OFF にすると、再生が完全に停止し、ハイライトも解除されます。
 - **一時停止/再開**: ポップアップの「一時停止」ボタンで再生を止め、「再開」ボタンで続きから再生できます。
-- **再生速度**: 現在は固定でベタ打ちで `audioPlayer.playbackRate` に設定しています．等倍速がかなり遅いため，2.0 倍速にしています．
-- **音声合成方式**: `auticle/config.json` の `synthesizerType` で音声合成エンジンを指定できます（現在は `"google_tts"` のみ対応）。設定変更後は拡張機能のリロードが必要です。
+- **再生速度**: 現在は固定で 2.0 倍速に設定しています。等倍速がかなり遅いため、2.0 倍速にしています。
+- **音声合成方式**: `audicle/config.json` の `synthesizerType` で音声合成エンジンを指定できます。設定変更後は拡張機能のリロードが必要です。
+  - **利用可能なエンジン**: `google_tts`（デフォルト）, `test`, `edge_tts`, `edge_tts_docker`
 
 ## 🧪 テスト方法
 
@@ -114,6 +115,38 @@ SynthesizerFactory.create(config.synthesizerType)
 4. **新ルール管理システムの動作確認**
    - Console で新ルール管理システムのログを確認
    - 現在のページで採用されるルール情報を確認
+
+### Edge TTS Docker テスト
+
+Docker 版 Edge TTS を使用する場合の追加テスト手順：
+
+1. **Docker サーバー起動**
+
+   ```bash
+   cd docker-tts-server
+   docker-compose up -d
+   ```
+
+2. **設定変更**
+
+   `audicle/config.json` を手動編集：
+
+   ```json
+   {
+     "synthesizerType": "edge_tts_docker"
+   }
+   ```
+
+3. **動作確認**
+
+   ```bash
+   curl http://localhost:8001/
+   ```
+
+4. **LAN アクセステスト** (他 PC から利用する場合)
+   - Docker の .env ファイルでポート設定を調整
+   - SSH ポートフォワーディング等でアクセス経路を設定
+   - 他 PC から音声再生をテスト
 
 ## 🔧 開発者向け - 新サイト対応ルール追加手順
 
