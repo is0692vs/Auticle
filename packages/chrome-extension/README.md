@@ -19,7 +19,7 @@ Audicle（Article + Audio）は、ウェブページ上の記事コンテンツ�
 
 ## 📖 使い方
 
-1. **インストール**: `chrome://extensions` ページで「パッケージ化されていない拡張機能を読み込む」を選択し、**`audicle`ディレクトリのみ** を読み込みます。
+1. **インストール**: `chrome://extensions` ページで「パッケージ化されていない拡張機能を読み込む」を選択し、**`packages/chrome-extension`ディレクトリ** を読み込みます。
 2. **有効化**: 読み上げたい記事ページを開き、ブラウザのツールバーにある Audicle アイコンをクリック。ポップアップ内の「読み上げモード」トグルスイッチを ON にします。
 3. **再生**: ページ上のハイライト可能になった段落をクリックすると、その位置から 2.0 倍速での読み上げが開始されます。
 4. **操作**:
@@ -64,27 +64,20 @@ SynthesizerFactory.create(config.synthesizerType)
 
 この設計により、将来的に Azure Cognitive Services、Amazon Polly、Web Speech API などの新しい音声合成エンジンを容易に追加できます。
 
-## 📂 ディレクトリ構造
+## 📂 プロジェクト構造 (モノレポ)
 
-```
-audicle/
-├── background.js         # 音声データ取得
-├── content.js            # ページ操作、再生キュー、ハイライト管理
-├── config.json           # 音声合成方式設定
-├── content-extract/      # コンテンツ抽出ルール管理
-│   └── rules.js          # サイト別抽出ルール定義
-├── images/               # アイコン画像
-│   ├── icon16.png
-│   ├── icon48.png
-│   └── icon128.png
-├── lib/
-│   └── Readability.js    # 本文抽出ライブラリ
-├── manifest.json         # 拡張機能の定義ファイル
-├── popup.css             # ポップアップのスタイル
-├── popup.html            # ポップアップのUI
-├── popup.js              # ポップアップの動作
-├── styles.css            # ページに注入されるハイライト用スタイル
-└── AUDIO_SYNTHESIS_MODULES.md  # 音声合成モジュール一覧
+本プロジェクトは、複数のパッケージを単一リポジトリで管理するモノレポ構成を採用しています。
+
+```bash
+/ (リポジトリルート)
+└── packages/
+    ├── chrome-extension/   # Chrome拡張機能の全ソースコード
+    │   ├── background.js
+    │   ├── content.js
+    │   ├── manifest.json
+    │   └── ... (その他)
+    └── api-server/         # (将来利用予定の) APIサーバー
+        └── (空の状態)
 ```
 
 ## ⚙️ 設定
