@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  edge-tts-docker:
+    build: .
+    container_name: audicle-edge-tts-docker
+    ports:
+      - "${TTS_HOST_PORT:-8001}:8001"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - audicle-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import requests; requests.get('http://localhost:8001/')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  audicle-network:
+    driver: bridge

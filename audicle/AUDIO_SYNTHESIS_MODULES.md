@@ -9,7 +9,16 @@ Audicle は疎結合な音声合成モジュール設計を採用しており、
 
 ## 📋 利用可能なモジュール
 
-### 1. Google TTS (推奨)
+### 1. Go**LAN アクセス設定**:
+
+Docker 版は固定で `localhost:8001` を使用します。LAN 内の他 PC から利用する場合は、Docker 側でポート公開設定を調整するか、ポートフォワーディングを使用してください：
+
+```bash
+# 例: SSH ポートフォワーディング
+ssh -L 8001:localhost:8001 server-pc
+```
+
+## 🔧 設定方法
 
 **設定値**: `"google_tts"`
 
@@ -127,6 +136,83 @@ Audicle は疎結合な音声合成モジュール設計を採用しており、
 
 3. **拡張機能リロード**: Chrome 拡張機能を更新
 
+---
+
+### 4. Edge TTS Docker (LAN 対応・高品質)
+
+**設定値**: `"edge_tts_docker"`
+
+```json
+{
+  "synthesizerType": "edge_tts_docker"
+}
+```
+
+**特徴**:
+
+- ✅ **最高品質**: Microsoft Edge TTS エンジンによる極めて自然な音声
+- ✅ **Docker 化**: 環境差によるトラブルを回避、一貫した動作を保証
+- ✅ **LAN アクセス**: 同じネットワーク内の他デバイスからアクセス可能
+- ✅ **設定可能**: .env ファイルでホスト・ポート設定を管理
+- ✅ **高速レスポンス**: コンテナ化されたローカルサーバーによる高速処理
+- ✅ **安定性**: 公式 API による安定した動作
+- ✅ **スケーラブル**: Docker Compose による簡単な運用管理
+- ⚠️ **Docker 必須**: Docker と Docker Compose の環境が必要
+- ⚠️ **初回セットアップ**: コンテナ構築に時間がかかる場合がある
+
+**適用場面**:
+
+- 複数デバイス間での音声合成サーバー共有
+- 開発チームでの統一された音声合成環境
+- LAN 内の他 PC から音声合成を利用したい場合
+- 安定した本番環境での長期運用
+- Docker 環境での統合開発
+
+**技術詳細**:
+
+- サーバー: Docker 化された Python Edge TTS Server
+- デフォルトエンドポイント: `http://localhost:8001` (固定設定)
+- 音声形式: MP3
+- デフォルト音声: ja-JP-NanamiNeural (女性)
+- LAN アクセス: 0.0.0.0 バインディングで全インターフェースに対応
+
+**セットアップ手順**:
+
+1. **Docker サーバー起動**:
+
+   ```bash
+   cd docker-tts-server
+   docker-compose up -d
+   ```
+
+2. **拡張機能設定**:
+
+   ```json
+   {
+     "synthesizerType": "edge_tts_docker"
+   }
+   ```
+
+3. **拡張機能リロード**: Chrome 拡張機能を更新
+
+4. **動作確認**:
+
+   ```bash
+   curl http://localhost:8001/
+   ```
+
+**LAN 設定例**:
+
+```json
+// PC-A (サーバー): docker-tts-server を起動
+// PC-B (クライアント): 以下の設定で PC-A のサーバーを利用
+{
+  "synthesizerType": "edge_tts_docker",
+  "dockerHost": "192.168.1.100", // PC-A の IP アドレス
+  "dockerPort": "8001"
+}
+```
+
 ## 🔧 設定方法
 
 ### 1. 設定ファイルの編集
@@ -135,7 +221,15 @@ Audicle は疎結合な音声合成モジュール設計を採用しており、
 
 ```json
 {
-  "synthesizerType": "google_tts" // または "test"
+  "synthesizerType": "google_tts" // または "test", "edge_tts", "edge_tts_docker"
+}
+```
+
+**Docker 版を使用する場合**:
+
+```json
+{
+  "synthesizerType": "edge_tts_docker"
 }
 ```
 
@@ -215,6 +309,14 @@ class SynthesizerFactory {
 
 - **本番非推奨**: 開発・テスト専用
 - **音声品質**: 実際の読み上げ品質は確認不可
+
+### Edge TTS Docker 使用時
+
+- **Docker 必須**: Docker と Docker Compose の環境が必要
+- **ポート開放**: LAN アクセスの場合はファイアウォール設定を確認
+- **リソース使用量**: メモリ 200-400MB、ディスク容量 約 800MB が必要
+- **初回起動**: 依存関係のダウンロードで時間がかかる場合がある
+- **ネットワーク**: 初回は Edge TTS ライブラリのダウンロードでインターネット接続が必要
 
 ### 設定変更時
 
