@@ -12,7 +12,7 @@ Auticle（Article + Audio）は、ウェブページ上の記事コンテンツ�
 - **連続再生 & プリフェッチ**: 記事の最後まで音声を自動で連続再生
 - **同期ハイライト**: 現在再生中の段落がリアルタイムでハイライト
 - **複数 TTS エンジン対応**: Google TTS、Edge TTS、API サーバーなどから選択可能
-- **Web UI**: Next.js ベースのモダンなWebアプリケーション
+- **Web UI**: Next.js ベースのモダンな Web アプリケーション
 - **記事管理**: 保存した記事の一覧表示と管理機能
 - **音声キャッシュ**: 高速な再生のためのキャッシュ機能
 
@@ -66,14 +66,16 @@ npm run dev
 ### 3. 使用開始
 
 #### Chrome 拡張機能の場合:
+
 1. 記事ページを開く（例: Wikipedia, Qiita, ブログ記事）
 2. Auticle アイコンをクリックし、「読み上げモード」を ON
 3. 読みたい段落をクリックすると音声再生が開始されます
 
 #### Web アプリケーションの場合:
+
 1. [http://localhost:3000](http://localhost:3000) にアクセス
 2. 「+ 新しい記事を読む」ボタンをクリック
-3. 記事URLを入力して「読込」
+3. 記事 URL を入力して「読込」
 4. 再生ボタンをクリックして音声読み上げを開始
 
 ## ⚙️ 設定
@@ -99,7 +101,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 ### 利用可能な TTS エンジン
 
 - `google_tts`: Google 翻訳 TTS（デフォルト）
-- `api_server`: 自前 API サーバー（高品質、2倍速対応）
+- `api_server`: 自前 API サーバー（高品質、2 倍速対応）
 - `edge_tts`: Microsoft Edge TTS
 - `edge_tts_docker`: Docker 版 Edge TTS
 
@@ -214,15 +216,18 @@ SITE_SPECIFIC_RULES = {
 ## 📖 詳細ドキュメント
 
 ### Web アプリケーション
+
 - [Web App README](packages/web-app/README.md)
 - [開発ブランチレポート](BRANCH_REPORT.md)
 - [実装完了レポート](packages/web-app/COMPLETION_REPORT.md)
 
 ### Chrome 拡張機能
+
 - [Chrome 拡張機能詳細](packages/chrome-extension/README.md)
 - [音声合成モジュール](packages/chrome-extension/AUDIO_SYNTHESIS_MODULES.md)
 
 ### API サーバー
+
 - [API サーバー仕様](packages/api-server/README.md)
 - [API サーバー実装レポート](packages/completion-report.md)
 
@@ -232,7 +237,7 @@ SITE_SPECIFIC_RULES = {
 - **利用制限**: Google TTS は非公式利用のため、大量リクエスト時はブロックされる可能性あり
 - **プライバシー**: テキストが外部サーバーに送信されます
 - **ブラウザ**: Google Chrome 向け（Chromium ベースブラウザでも動作可能）
-- **Web App**: 最新の機能（2倍速再生、キャッシュ、記事管理）は Web App で利用可能
+- **Web App**: 最新の機能（2 倍速再生、キャッシュ、記事管理）は Web App で利用可能
 
 ## 🤝 貢献
 

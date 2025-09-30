@@ -1,14 +1,14 @@
 # Auticle Web App
 
-Next.js ベースのモダンな Web アプリケーション。音楽プレイヤーのような直感的なUIで、Webページの記事を音声読み上げします。
+Next.js ベースのモダンな Web アプリケーション。音楽プレイヤーのような直感的な UI で、Web ページの記事を音声読み上げします。
 
 ## ✨ 主な機能
 
-- **記事抽出・表示**: URLから本文を抽出し、チャンク単位で表示
-- **音声再生**: 連続再生、自動スクロール、クリック再生（Seek機能）
-- **2倍速再生**: 高速な読み上げ体験
+- **記事抽出・表示**: URL から本文を抽出し、チャンク単位で表示
+- **音声再生**: 連続再生、自動スクロール、クリック再生（Seek 機能）
+- **2 倍速再生**: 高速な読み上げ体験
 - **記事管理**: 保存した記事の一覧表示と管理機能
-- **音声キャッシュ**: 3チャンク先読みによるスムーズな再生
+- **音声キャッシュ**: 3 チャンク先読みによるスムーズな再生
 - **ログ機能**: 詳細なデバッグ情報出力
 - **レスポンシブデザイン**: モバイル・デスクトップ対応
 
@@ -26,7 +26,7 @@ Next.js ベースのモダンな Web アプリケーション。音楽プレイ�
 ### 前提条件
 
 - Node.js 18+
-- APIサーバーが起動していること (`http://localhost:8000`)
+- API サーバーが起動していること (`http://localhost:8000`)
 
 ### インストール & 起動
 
@@ -61,7 +61,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 1. **記事一覧ページ** (`/`) にアクセス
 2. **「+ 新しい記事を読む」** をクリック
-3. **記事URLを入力** して「読込」
+3. **記事 URL を入力** して「読込」
 4. **再生ボタン** をクリックして音声読み上げ開始
 
 ### 記事管理
@@ -88,7 +88,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 # 4. キャッシュが効いて高速再生される
 ```
 
-### API連携テスト
+### API 連携テスト
 
 ```bash
 # コンソールログを確認
@@ -97,7 +97,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 # - 先読みログ
 ```
 
-### 推奨テストURL
+### 推奨テスト URL
 
 - **技術記事**: Qiita, Zenn, はてなブログ
 - **ニュース**: NHK, 主要新聞社
@@ -135,12 +135,15 @@ packages/web-app/
 
 ### 拡張方法
 
-#### 新しいTTSエンジンの追加
+#### 新しい TTS エンジンの追加
 
 `lib/api.ts` の `synthesizeSpeech` 関数を拡張：
 
 ```typescript
-export async function synthesizeSpeech(text: string, voice = "ja-JP-Wavenet-B"): Promise<Blob> {
+export async function synthesizeSpeech(
+  text: string,
+  voice = "ja-JP-Wavenet-B"
+): Promise<Blob> {
   // エンジン選択ロジックを追加
   const engine = getSelectedEngine();
   return engine.synthesize(text, voice);
@@ -156,20 +159,22 @@ class AudioCache {
   // キャッシュサイズ制限を追加
   private maxSize = 50;
   // 永続化機能を追加
-  saveToStorage() { /* ... */ }
+  saveToStorage() {
+    /* ... */
+  }
 }
 ```
 
 ## 📊 パフォーマンス
 
-- **初回再生**: API呼び出し + 音声合成（~2-3秒）
-- **キャッシュ再生**: 即時再生（~0.1秒）
-- **先読み**: 3チャンク分の音声をバックグラウンドで準備
-- **メモリ使用**: 24時間自動クリーンアップ
+- **初回再生**: API 呼び出し + 音声合成（~2-3 秒）
+- **キャッシュ再生**: 即時再生（~0.1 秒）
+- **先読み**: 3 チャンク分の音声をバックグラウンドで準備
+- **メモリ使用**: 24 時間自動クリーンアップ
 
 ## 🐛 トラブルシューティング
 
-### APIサーバーが接続できない
+### API サーバーが接続できない
 
 ```bash
 # APIサーバーの起動確認
@@ -199,4 +204,4 @@ docker-compose logs api-server
 - [プロジェクト全体 README](../../README.md)
 - [開発ブランチレポート](BRANCH_REPORT.md)
 - [実装完了レポート](COMPLETION_REPORT.md)
-- [APIサーバー仕様](../api-server/README.md)
+- [API サーバー仕様](../api-server/README.md)
