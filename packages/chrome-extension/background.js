@@ -148,6 +148,55 @@ class EdgeTTSDockerSynthesizer extends AudioSynthesizer {
   }
 }
 
+// Google Cloud TTS Docker 実装
+class GoogleCloudTTSDockerSynthesizer extends AudioSynthesizer {
+  constructor() {
+    super();
+    this.serverUrl = "http://localhost:8002";
+  }
+
+  async synthesize(text) {
+    console.log(`[GoogleCloudTTSDockerSynthesizer] Synthesizing: "${text}"`);
+    console.log(
+      `[GoogleCloudTTSDockerSynthesizer] Server URL: ${this.serverUrl}`
+    );
+
+    try {
+      const cleanedText = cleanText(text);
+
+      const response = await fetch(`${this.serverUrl}/synthesize/simple`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: cleanedText,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Google Cloud TTS Docker error: ${response.status} ${response.statusText} ${errorText}`
+        );
+      }
+
+      const blob = await response.blob();
+
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error(`[GoogleCloudTTSDockerSynthesizer] Error:`, error);
+      throw new Error(
+        `Google Cloud TTS Docker synthesis failed: ${error.message}`
+      );
+    }
+  }
+}
+
 // API Server実装（新しいAPIサーバーを使用）
 class APIServerSynthesizer extends AudioSynthesizer {
   constructor() {
@@ -205,6 +254,8 @@ class SynthesizerFactory {
         return new EdgeTTSSynthesizer();
       case "edge_tts_docker":
         return new EdgeTTSDockerSynthesizer();
+      case "google_cloud_tts_docker":
+        return new GoogleCloudTTSDockerSynthesizer();
       case "api_server":
         return new APIServerSynthesizer();
       default:
