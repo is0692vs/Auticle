@@ -1,5 +1,9 @@
 # Audicle
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-blue.svg)](packages/chrome-extension)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black)](packages/web-app)
+
 Audicle（Article + Audio）は、ウェブページ上の記事コンテンツを音声で読み上げるプラットフォームです。
 
 クリックした段落から、記事の最後までをインテリジェントに読み上げ、再生箇所をハイライトすることで、快適な「ながら読書」体験を提供します。
@@ -7,6 +11,26 @@ Audicle（Article + Audio）は、ウェブページ上の記事コンテンツ�
 ![デモ画像](packages/chrome-extension/docs/simpledemo.png)
 
 > 💡 **デモ動画を作成したい方へ**: [デモ動画作成ガイド](docs/DEMO_VIDEO_GUIDE.md) を参照してください。
+
+---
+
+## 📑 目次
+
+- [概要](#-概要)
+- [主な機能](#-主な機能)
+- [プロジェクト構造](#-プロジェクト構造)
+- [クイックスタート](#-クイックスタート)
+- [設定](#%EF%B8%8F-設定)
+- [テスト](#-テスト)
+- [開発](#-開発)
+- [詳細ドキュメント](#-詳細ドキュメント)
+- [注意事項](#-注意事項)
+- [よくある質問（FAQ）](#-よくある質問faq)
+- [サポート・コミュニティ](#-サポートコミュニティ)
+- [貢献](#-貢献)
+- [ライセンス](#-ライセンス)
+
+---
 
 ## 📖 概要
 
@@ -313,6 +337,14 @@ SITE_SPECIFIC_RULES = {
 1. VS Code で `Dev Containers: Reopen in Container` を実行
 2. 自動的に開発環境が構築されます
 3. 詳細は「🔧 開発」セクションを参照
+
+## 💬 サポート・コミュニティ
+
+質問や問題がある場合は、以下の方法でサポートを受けられます：
+
+- **GitHub Issues**: [バグ報告や機能要望](https://github.com/is0692vs/Audicle/issues)
+- **GitHub Discussions**: 一般的な質問や議論（準備中）
+- **ドキュメント**: [詳細ドキュメント](#-詳細ドキュメント) を参照
 
 ## 🤝 貢献
 
