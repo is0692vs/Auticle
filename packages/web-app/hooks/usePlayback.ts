@@ -2,12 +2,15 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Chunk } from "@/types/api";
-import { synthesizeSpeech } from "@/lib/api";
+import { audioCache } from "@/lib/audioCache";
+import { logger } from "@/lib/logger";
 
 interface UsePlaybackProps {
   chunks: Chunk[];
   onChunkChange?: (chunkId: string) => void;
 }
+
+const PREFETCH_AHEAD = 3; // 3つ先まで先読み
 
 export function usePlayback({ chunks, onChunkChange }: UsePlaybackProps) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -16,7 +19,6 @@ export function usePlayback({ chunks, onChunkChange }: UsePlaybackProps) {
   const [error, setError] = useState<string>("");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioUrlRef = useRef<string | null>(null);
 
   // 現在のチャンクID
   const currentChunkId =
@@ -24,13 +26,20 @@ export function usePlayback({ chunks, onChunkChange }: UsePlaybackProps) {
       ? chunks[currentIndex].id
       : undefined;
 
-  // 音声URLのクリーンアップ
-  const cleanupAudioUrl = useCallback(() => {
-    if (audioUrlRef.current) {
-      URL.revokeObjectURL(audioUrlRef.current);
-      audioUrlRef.current = null;
-    }
-  }, []);
+  // 先読み処理
+  const prefetchAudio = useCallback(
+    async (startIndex: number) => {
+      const endIndex = Math.min(startIndex + PREFETCH_AHEAD, chunks.length);
+      const textsToFetch = chunks
+        .slice(startIndex, endIndex)
+        .map((chunk) => chunk.text);
+
+      if (textsToFetch.length > 0) {
+        await audioCache.prefetch(textsToFetch);
+      }
+    },
+    [chunks]
+  );
 
   // 特定のインデックスから再生
   const playFromIndex = useCallback(
@@ -45,15 +54,13 @@ export function usePlayback({ chunks, onChunkChange }: UsePlaybackProps) {
       try {
         const chunk = chunks[index];
 
-        // 音声を合成
-        const audioBlob = await synthesizeSpeech(chunk.text);
+        logger.info(`▶️ 再生開始: チャンク ${index + 1}/${chunks.length}`);
 
-        // 古いURLをクリーンアップ
-        cleanupAudioUrl();
+        // キャッシュから音声URLを取得（なければ合成）
+        const audioUrl = await audioCache.get(chunk.text);
 
-        // 新しい音声URLを作成
-        const audioUrl = URL.createObjectURL(audioBlob);
-        audioUrlRef.current = audioUrl;
+        // 先読み処理（非同期で実行）
+        prefetchAudio(index + 1);
 
         // Audio要素を作成して再生
         if (audioRef.current) {
@@ -83,13 +90,14 @@ export function usePlayback({ chunks, onChunkChange }: UsePlaybackProps) {
         setIsPlaying(true);
         onChunkChange?.(chunk.id);
       } catch (err) {
+        logger.error("再生エラー", err);
         setError(err instanceof Error ? err.message : "エラーが発生しました");
         setIsPlaying(false);
       } finally {
         setIsLoading(false);
       }
     },
-    [chunks, cleanupAudioUrl, onChunkChange]
+    [chunks, onChunkChange, prefetchAudio]
   );
 
   // 再生開始
@@ -112,10 +120,9 @@ export function usePlayback({ chunks, onChunkChange }: UsePlaybackProps) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
-    cleanupAudioUrl();
     setIsPlaying(false);
     setCurrentIndex(-1);
-  }, [cleanupAudioUrl]);
+  }, []);
 
   // 特定のチャンクから再生（Seek機能）
   const seekToChunk = useCallback(
@@ -134,9 +141,8 @@ export function usePlayback({ chunks, onChunkChange }: UsePlaybackProps) {
       if (audioRef.current) {
         audioRef.current.pause();
       }
-      cleanupAudioUrl();
     };
-  }, [cleanupAudioUrl]);
+  }, []);
 
   return {
     isPlaying,

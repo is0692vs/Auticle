@@ -3,6 +3,7 @@ import {
   ExtractResponse,
   SynthesizeRequest,
 } from "@/types/api";
+import { logger } from "./logger";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -11,6 +12,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
  */
 export async function extractContent(url: string): Promise<ExtractResponse> {
   const request: ExtractRequest = { url };
+
+  logger.apiRequest("POST", `${API_BASE_URL}/extract`, request);
 
   const response = await fetch(`${API_BASE_URL}/extract`, {
     method: "POST",
@@ -22,10 +25,14 @@ export async function extractContent(url: string): Promise<ExtractResponse> {
 
   if (!response.ok) {
     const error = await response.text();
+    logger.error(`抽出エラー: ${error}`);
     throw new Error(`抽出に失敗しました: ${error}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  logger.apiResponse(`${API_BASE_URL}/extract`, data);
+
+  return data;
 }
 
 /**
@@ -38,6 +45,11 @@ export async function synthesizeSpeech(
 ): Promise<Blob> {
   const request: SynthesizeRequest = { text, voice };
 
+  logger.apiRequest("POST", `${API_BASE_URL}/synthesize`, {
+    text: text.substring(0, 50) + "...",
+    voice,
+  });
+
   const response = await fetch(`${API_BASE_URL}/synthesize`, {
     method: "POST",
     headers: {
@@ -48,8 +60,12 @@ export async function synthesizeSpeech(
 
   if (!response.ok) {
     const error = await response.text();
+    logger.error(`音声合成エラー: ${error}`);
     throw new Error(`音声合成に失敗しました: ${error}`);
   }
 
-  return response.blob();
+  const blob = await response.blob();
+  logger.success(`音声合成完了: ${blob.size} bytes`);
+
+  return blob;
 }
