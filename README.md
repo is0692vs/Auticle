@@ -6,6 +6,8 @@ Audicle（Article + Audio）は、ウェブページ上の記事コンテンツ�
 
 ![デモ画像](packages/chrome-extension/docs/simpledemo.png)
 
+> 💡 **デモ動画を作成したい方へ**: [デモ動画作成ガイド](docs/DEMO_VIDEO_GUIDE.md) を参照してください。
+
 ## 📖 概要
 
 Audicle は、Web ブラウジング中に記事を「読む」のではなく「聴く」ことを可能にするプラットフォームです。
@@ -245,6 +247,12 @@ SITE_SPECIFIC_RULES = {
 
 ## 📖 詳細ドキュメント
 
+### プロジェクト全体
+
+- **[貢献ガイド](CONTRIBUTING.md)** - 開発に参加する方法
+- **[デモ動画作成ガイド](docs/DEMO_VIDEO_GUIDE.md)** - デモ動画を作成する方法
+- **[ライセンス](LICENSE)** - MIT License
+
 ### Web アプリケーション
 
 - [Web App README](packages/web-app/README.md)
@@ -255,6 +263,7 @@ SITE_SPECIFIC_RULES = {
 
 - [Chrome 拡張機能詳細](packages/chrome-extension/README.md)
 - [音声合成モジュール](packages/chrome-extension/AUDIO_SYNTHESIS_MODULES.md)
+- [サイト対応ルール追加ガイド](packages/chrome-extension/content-extract/RULE_ADDITION_GUIDE.md)
 
 ### API サーバー
 
@@ -307,50 +316,25 @@ SITE_SPECIFIC_RULES = {
 
 ## 🤝 貢献
 
-Audicle へのコントリビューションを歓迎します！以下の方法で貢献できます：
+Audicle へのコントリビューションを歓迎します！
 
-### バグ報告・機能要望
+### クイックスタート
 
-GitHub Issues で報告してください：
-- バグを発見した場合: 再現手順と環境情報を含めて Issue を作成
-- 新機能の提案: 具体的なユースケースと共に Issue を作成
+1. リポジトリをフォーク
+2. 機能ブランチを作成 (`git checkout -b feature/amazing-feature`)
+3. 変更をコミット (`git commit -m 'feat: Add amazing feature'`)
+4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
+5. Pull Request を作成
 
-### プルリクエストの手順
+### 詳細なガイドライン
 
-1. **リポジトリをフォーク**
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/Audicle.git
-   cd Audicle
-   ```
+貢献方法の詳細については、[CONTRIBUTING.md](CONTRIBUTING.md) をご覧ください：
 
-2. **機能ブランチを作成**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-3. **変更を実装**
-   - コーディング規約に従ってください
-   - 適切なコミットメッセージを記述してください
-
-4. **テストを実行**
-   ```bash
-   # Chrome 拡張機能のテスト
-   open packages/chrome-extension/test/test.html
-   
-   # Web アプリのテスト
-   cd packages/web-app && npm run dev
-   ```
-
-5. **プッシュして Pull Request を作成**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-### 開発のガイドライン
-
-- **コードスタイル**: 既存のコードスタイルに合わせてください
-- **コミットメッセージ**: [Conventional Commits](https://www.conventionalcommits.org/) 形式を推奨
-- **ドキュメント**: 新機能を追加した場合は、関連するドキュメントも更新してください
+- バグ報告・機能要望の方法
+- 開発環境のセットアップ
+- コーディング規約
+- コミットメッセージ規約
+- プルリクエストのテンプレート
 
 ## 📄 ライセンス
 
