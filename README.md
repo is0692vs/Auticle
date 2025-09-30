@@ -111,7 +111,37 @@ curl -X POST http://localhost:8000/synthesize \
 
 ## 🔧 開発
 
-### 環境構築
+### Dev Container での開発（推奨）
+
+このプロジェクトは VS Code Dev Containers をサポートしています。一貫した開発環境を簡単に構築できます。
+
+#### Dev Container の使用方法
+
+1. **VS Code をインストール**
+2. **Dev Containers 拡張機能をインストール**
+3. **プロジェクトを開く**: `File > Open Folder` でプロジェクトルートを選択
+4. **コンテナを開く**: コマンドパレット (`Ctrl+Shift+P`) で "Dev Containers: Reopen in Container" を実行
+5. **環境構築完了**: 自動的に必要なツールと拡張機能がインストールされます
+
+Dev Container には以下のツールが含まれています：
+
+- Node.js & npm (Chrome 拡張機能開発用)
+- Python & pip (API サーバー開発用)
+- Docker & Docker Compose (コンテナ化されたサービス用)
+- Git & GitHub CLI
+- 各種 VS Code 拡張機能（Python, Docker, Chrome Debug など）
+
+#### ポートフォワーディング
+
+Dev Container では以下のポートが自動的にフォワードされます：
+
+- `8000`: API Server
+- `8001`: Google TTS Server
+- `8002`: Python TTS Server
+
+### ローカル環境構築（手動）
+
+Dev Container を使用しない場合は、手動で環境を構築してください：
 
 ```bash
 # Node.js 依存関係（Chrome 拡張機能用）
