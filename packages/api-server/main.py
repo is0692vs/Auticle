@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import asyncio
 import subprocess
@@ -16,6 +17,15 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Audicle API Server", version="1.0.0")
+
+# CORS設定
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Google Cloud TTS クライアント
 _client: texttospeech.TextToSpeechClient = None
@@ -70,8 +80,12 @@ async def _synthesize_to_bytes(text: str, voice: str) -> bytes:
         name=voice,
     )
 
+    # 環境変数から再生速度を取得（デフォルト: 2.0倍速）
+    speaking_rate = float(os.getenv("TTS_SPEAKING_RATE", "2.0"))
+
     audio_config = texttospeech.AudioConfig(
         audio_encoding=texttospeech.AudioEncoding.MP3,
+        speaking_rate=speaking_rate,
     )
 
     def _call_api() -> bytes:
@@ -111,21 +125,21 @@ async def extract_content(request: ExtractRequest):
             text=True,
             timeout=30
         )
-        
+
         if result.returncode != 0:
             raise HTTPException(
                 status_code=400,
                 detail=f"Extraction failed: {result.stderr}"
             )
-        
+
         # JSONレスポンスをパース
         extracted_data = json.loads(result.stdout)
-        
+
         return ExtractResponse(
             title=extracted_data.get("title", ""),
             chunks=extracted_data.get("chunks", [])
         )
-    
+
     except subprocess.TimeoutExpired:
         raise HTTPException(status_code=408, detail="Extraction timeout")
     except json.JSONDecodeError:
@@ -146,27 +160,27 @@ async def synthesize_speech(request: SynthesizeRequest):
     try:
         logger.info(f"Synthesizing text: {request.text}")
         logger.info(f"Using voice: {request.voice}")
-        
+
         audio_data = await _synthesize_to_bytes(request.text, request.voice)
-        
+
         return Response(
             content=audio_data,
             media_type="audio/mpeg",
             headers={"Content-Disposition": "attachment; filename=speech.mp3"}
         )
-        
+
     except Exception as e:
         logger.error(f"Synthesis error: {str(e)}")
-        
+
         # フォールバック処理
         try:
             logger.info("Attempting fallback: returning test audio file")
-            
+
             fallback_path = "fallback.mp3"
             if os.path.exists(fallback_path):
                 async with aiofiles.open(fallback_path, "rb") as fallback_file:
                     fallback_audio = await fallback_file.read()
-                
+
                 content_disposition = "attachment; filename=fallback.mp3"
                 return Response(
                     content=fallback_audio,
@@ -191,7 +205,7 @@ async def synthesize_speech(request: SynthesizeRequest):
                         "X-Error": str(e)
                     }
                 )
-                
+
         except Exception as fallback_error:
             logger.error(f"Fallback also failed: {str(fallback_error)}")
             raise HTTPException(
