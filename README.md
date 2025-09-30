@@ -1,8 +1,26 @@
-# Auticle
+# Audicle
 
-Auticle（Article + Audio）は、ウェブページ上の記事コンテンツを音声で読み上げるプラットフォームです。
+Audicle（Article + Audio）は、ウェブページ上の記事コンテンツを音声で読み上げるプラットフォームです。
 
 クリックした段落から、記事の最後までをインテリジェントに読み上げ、再生箇所をハイライトすることで、快適な「ながら読書」体験を提供します。
+
+![デモ画像](packages/chrome-extension/docs/simpledemo.png)
+
+## 📖 概要
+
+Audicle は、Web ブラウジング中に記事を「読む」のではなく「聴く」ことを可能にするプラットフォームです。
+
+**こんな方におすすめ:**
+- 家事や運動をしながら情報収集したい方
+- 長時間の画面注視による眼精疲労を軽減したい方
+- 通勤・通学中にニュース記事やブログを楽しみたい方
+- 読書バリアフリーを求める方
+
+**特徴:**
+- Chrome 拡張機能と Web アプリケーションの両方で利用可能
+- モノレポ構成で、拡張機能・API サーバー・Web UI を一元管理
+- 複数の音声合成エンジン（Google TTS、Edge TTS など）に対応
+- オープンソースで自由にカスタマイズ可能
 
 ## ✨ 主な機能
 
@@ -37,11 +55,25 @@ Auticle（Article + Audio）は、ウェブページ上の記事コンテンツ�
 
 ## 🚀 クイックスタート
 
-### 1. API サーバーの起動（共通）
+### 前提条件
+
+- **Node.js** 18 以上（Web アプリケーション用）
+- **Docker** & **Docker Compose**（API サーバー用）
+- **Google Chrome** または **Chromium ベースブラウザ**（拡張機能用）
+
+### 1. API サーバーの起動（オプション）
+
+API サーバーは、高品質な音声合成と 2 倍速再生を提供します。Google TTS のみを使用する場合は、このステップをスキップできます。
 
 ```bash
 cd packages/api-server
 docker-compose up -d
+```
+
+**確認方法:**
+```bash
+curl http://localhost:8000/
+# {"message": "Audicle TTS API Server is running"} が返ればOK
 ```
 
 ### 2. 利用方法の選択
@@ -68,7 +100,7 @@ npm run dev
 #### Chrome 拡張機能の場合:
 
 1. 記事ページを開く（例: Wikipedia, Qiita, ブログ記事）
-2. Auticle アイコンをクリックし、「読み上げモード」を ON
+2. Audicle アイコンをクリックし、「読み上げモード」を ON
 3. 読みたい段落をクリックすると音声再生が開始されます
 
 #### Web アプリケーションの場合:
@@ -141,8 +173,6 @@ curl -X POST http://localhost:8000/extract \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com/article"}'
 ```
-
-## 🔧 開発
 
 ## 🔧 開発
 
@@ -239,12 +269,88 @@ SITE_SPECIFIC_RULES = {
 - **ブラウザ**: Google Chrome 向け（Chromium ベースブラウザでも動作可能）
 - **Web App**: 最新の機能（2 倍速再生、キャッシュ、記事管理）は Web App で利用可能
 
+## 🔍 よくある質問（FAQ）
+
+### Q: 音声が再生されません
+
+**A:** 以下を確認してください：
+1. API サーバーが起動しているか（`curl http://localhost:8000/` で確認）
+2. `config.json` の `synthesizerType` 設定が正しいか
+3. Chrome 拡張機能がリロードされているか（`chrome://extensions/` でリロードボタンをクリック）
+4. ブラウザのコンソールにエラーが表示されていないか
+
+### Q: 一部のサイトで本文が正しく抽出されません
+
+**A:** サイト固有のルールを追加することで改善できます：
+1. `packages/chrome-extension/content-extract/rules.js` を開く
+2. `SITE_SPECIFIC_RULES` に新しいルールを追加
+3. 詳細は [Chrome 拡張機能 README](packages/chrome-extension/README.md) の「新サイト対応ルール追加手順」を参照
+
+### Q: Google TTS が「429 Too Many Requests」エラーになります
+
+**A:** Google TTS は非公式 API のため、大量リクエストでブロックされる可能性があります：
+- API サーバー（Edge TTS）への切り替えを推奨します
+- `config.json` で `"synthesizerType": "api_server"` に変更
+
+### Q: 2 倍速再生を使いたい
+
+**A:** 2 倍速再生は API サーバーまたは Web アプリで利用可能です：
+- Chrome 拡張機能: `config.json` で `"synthesizerType": "api_server"` に設定
+- Web アプリ: デフォルトで 2 倍速再生に対応
+
+### Q: Dev Container で開発したい
+
+**A:** VS Code の Dev Containers 拡張機能を使用してください：
+1. VS Code で `Dev Containers: Reopen in Container` を実行
+2. 自動的に開発環境が構築されます
+3. 詳細は「🔧 開発」セクションを参照
+
 ## 🤝 貢献
 
-1. Fork してブランチを作成
-2. 変更を実装
-3. テストを実行
-4. Pull Request を作成
+Audicle へのコントリビューションを歓迎します！以下の方法で貢献できます：
+
+### バグ報告・機能要望
+
+GitHub Issues で報告してください：
+- バグを発見した場合: 再現手順と環境情報を含めて Issue を作成
+- 新機能の提案: 具体的なユースケースと共に Issue を作成
+
+### プルリクエストの手順
+
+1. **リポジトリをフォーク**
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/Audicle.git
+   cd Audicle
+   ```
+
+2. **機能ブランチを作成**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+3. **変更を実装**
+   - コーディング規約に従ってください
+   - 適切なコミットメッセージを記述してください
+
+4. **テストを実行**
+   ```bash
+   # Chrome 拡張機能のテスト
+   open packages/chrome-extension/test/test.html
+   
+   # Web アプリのテスト
+   cd packages/web-app && npm run dev
+   ```
+
+5. **プッシュして Pull Request を作成**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+### 開発のガイドライン
+
+- **コードスタイル**: 既存のコードスタイルに合わせてください
+- **コミットメッセージ**: [Conventional Commits](https://www.conventionalcommits.org/) 形式を推奨
+- **ドキュメント**: 新機能を追加した場合は、関連するドキュメントも更新してください
 
 ## 📄 ライセンス
 
