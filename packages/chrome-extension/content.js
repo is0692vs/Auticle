@@ -270,17 +270,42 @@ audioPlayer.addEventListener("error", (e) => {
   }
 });
 
+// 現在のページのホスト名を取得
+function getCurrentHostname() {
+  try {
+    return window.location.hostname;
+  } catch (e) {
+    console.error("Failed to get hostname:", e);
+    return "";
+  }
+}
+
+// 現在のURLの有効/無効状態を取得する
+function loadCurrentUrlState(callback) {
+  const hostname = getCurrentHostname();
+  chrome.storage.local.get(["urlStates", "enabled"], (result) => {
+    const urlStates = result.urlStates || {};
+    // URLごとの状態が存在すればそれを使用、なければグローバルのenabledを使用（後方互換性）
+    const isEnabled =
+      hostname in urlStates ? urlStates[hostname] : !!result.enabled;
+    callback(isEnabled);
+  });
+}
+
 // ストレージの変更（主に有効/無効の変更）を監視
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.enabled !== undefined) {
-    isEnabled = !!changes.enabled.newValue;
-    updatePageState(isEnabled);
+  // urlStatesまたはenabledが変更された場合、現在のURLの状態を再チェック
+  if (changes.urlStates !== undefined || changes.enabled !== undefined) {
+    loadCurrentUrlState((enabled) => {
+      isEnabled = enabled;
+      updatePageState(isEnabled);
+    });
   }
 });
 
 // ページ読み込み時に一度だけ、現在の状態で初期化
-chrome.storage.local.get(["enabled"], (result) => {
-  isEnabled = !!result.enabled;
+loadCurrentUrlState((enabled) => {
+  isEnabled = enabled;
   updatePageState(isEnabled);
 });
 
