@@ -14,7 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Auticle - Web Reader with TTS",
-  description: "音楽アプリの歌詞表示のような体験で、Webページの本文を読み上げます",
+  description:
+    "音楽アプリの歌詞表示のような体験で、Webページの本文を読み上げます",
 };
 
 export default function RootLayout({

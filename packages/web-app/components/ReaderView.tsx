@@ -22,19 +22,19 @@ export default function ReaderView({
     if (currentChunkId && activeChunkRef.current && containerRef.current) {
       const element = activeChunkRef.current;
       const container = containerRef.current;
-      
+
       // 要素の位置を取得
       const elementRect = element.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
-      
+
       // コンテナの中央に要素を配置するためのスクロール位置を計算
-      const scrollTop = 
-        container.scrollTop + 
-        elementRect.top - 
-        containerRect.top - 
-        (containerRect.height / 2) + 
-        (elementRect.height / 2);
-      
+      const scrollTop =
+        container.scrollTop +
+        elementRect.top -
+        containerRect.top -
+        containerRect.height / 2 +
+        elementRect.height / 2;
+
       // スムーズにスクロール
       container.scrollTo({
         top: scrollTop,

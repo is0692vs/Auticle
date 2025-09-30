@@ -1,10 +1,10 @@
 # Auticle Web App
 
-Next.jsベースのWebアプリケーション。音楽アプリの歌詞表示のような体験で、Webページの本文を読み上げます。
+Next.js ベースの Web アプリケーション。音楽アプリの歌詞表示のような体験で、Web ページの本文を読み上げます。
 
 ## Features
 
-- URLからWebページの本文を抽出
+- URL から Web ページの本文を抽出
 - 抽出した本文を段落ごとに音声合成して再生
 - 再生中の段落をハイライト表示
 - 自動スクロールで再生位置を追従
@@ -21,8 +21,8 @@ Next.jsベースのWebアプリケーション。音楽アプリの歌詞表示�
 
 ### Prerequisites
 
-- Node.js 18以上
-- api-serverが起動していること (http://localhost:8000)
+- Node.js 18 以上
+- api-server が起動していること (http://localhost:8000)
 
 ### Installation
 
@@ -49,5 +49,5 @@ npm start
 
 このアプリケーションは `packages/api-server` と連携します:
 
-- `POST /extract` - URLからテキストを抽出
+- `POST /extract` - URL からテキストを抽出
 - `POST /synthesize` - テキストを音声に変換

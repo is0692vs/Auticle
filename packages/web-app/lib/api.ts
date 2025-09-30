@@ -9,9 +9,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 /**
  * URLから本文を抽出する
  */
-export async function extractContent(
-  url: string
-): Promise<ExtractResponse> {
+export async function extractContent(url: string): Promise<ExtractResponse> {
   const request: ExtractRequest = { url };
 
   const response = await fetch(`${API_BASE_URL}/extract`, {

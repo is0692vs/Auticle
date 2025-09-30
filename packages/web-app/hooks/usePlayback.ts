@@ -14,14 +14,15 @@ export function usePlayback({ chunks, onChunkChange }: UsePlaybackProps) {
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
-  
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
 
   // 現在のチャンクID
-  const currentChunkId = currentIndex >= 0 && currentIndex < chunks.length
-    ? chunks[currentIndex].id
-    : undefined;
+  const currentChunkId =
+    currentIndex >= 0 && currentIndex < chunks.length
+      ? chunks[currentIndex].id
+      : undefined;
 
   // 音声URLのクリーンアップ
   const cleanupAudioUrl = useCallback(() => {
@@ -43,13 +44,13 @@ export function usePlayback({ chunks, onChunkChange }: UsePlaybackProps) {
 
       try {
         const chunk = chunks[index];
-        
+
         // 音声を合成
         const audioBlob = await synthesizeSpeech(chunk.text);
-        
+
         // 古いURLをクリーンアップ
         cleanupAudioUrl();
-        
+
         // 新しい音声URLを作成
         const audioUrl = URL.createObjectURL(audioBlob);
         audioUrlRef.current = audioUrl;
@@ -58,7 +59,7 @@ export function usePlayback({ chunks, onChunkChange }: UsePlaybackProps) {
         if (audioRef.current) {
           audioRef.current.pause();
         }
-        
+
         const audio = new Audio(audioUrl);
         audioRef.current = audio;
 

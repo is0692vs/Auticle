@@ -32,7 +32,7 @@ export default function Home() {
 
     try {
       const response = await extractContent(url);
-      
+
       // chunksにIDを付与
       const chunksWithId: Chunk[] = response.chunks.map((text, index) => ({
         id: `chunk-${index}`,
@@ -88,7 +88,7 @@ export default function Home() {
               {playbackError}
             </div>
           )}
-          
+
           {/* 再生コントロール */}
           {chunks.length > 0 && (
             <div className="mt-4 flex gap-2">
