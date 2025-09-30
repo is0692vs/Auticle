@@ -1,12 +1,22 @@
 /* Audicle Styles */
 .audicle-clickable {
   cursor: pointer;
+  transition: background-color 120ms ease, box-shadow 120ms ease,
+    color 120ms ease;
 }
 
 .audicle-clickable:hover {
-  background-color: #f0f8ff;
+  background-color: var(--audicle-hover-bg, rgba(59, 130, 246, 0.12));
+  box-shadow: inset 0 0 0 1px
+    var(--audicle-hover-outline, rgba(59, 130, 246, 0.35));
 }
 
 .audicle-highlight {
-  background-color: #ffffbe;
+  background-color: var(--audicle-highlight-bg, #ffe066);
+  color: var(--audicle-highlight-color, inherit);
+  box-shadow: inset 0 0 0 2px
+    var(--audicle-highlight-outline, rgba(0, 0, 0, 0.25));
+  border-radius: 4px;
+  transition: background-color 160ms ease, color 160ms ease,
+    box-shadow 160ms ease;
 }

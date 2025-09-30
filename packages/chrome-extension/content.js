@@ -296,9 +296,10 @@ function updatePageState(enabled) {
 function preparePage() {
   // ドメインを取得
   const hostname = window.location.hostname;
+  let preparedWithCustomRule = false;
+
   if (customRules[hostname]) {
     // 独自ルールで要素を準備
-    const rule = customRules[hostname];
     const container = document.querySelector(
       "#personal-public-article-body .mdContent-inner"
     );
@@ -306,35 +307,26 @@ function preparePage() {
       const allElements = container.querySelectorAll("*");
       let paragraphId = 0;
       allElements.forEach((el) => {
-        const tagName = el.tagName.toLowerCase();
-        const text = (el.textContent || "").trim();
-        if (
-          text &&
-          (tagName === "p" ||
-            (tagName === "li" && el.closest("ul")) ||
-            (tagName === "li" && el.closest("ol")) ||
-            tagName === "h1" ||
-            tagName === "h2" ||
-            tagName === "h3" ||
-            tagName === "h4" ||
-            tagName === "h5" ||
-            tagName === "h6" ||
-            tagName === "blockquote" ||
-            tagName === "pre")
-        ) {
-          el.dataset.audicleId = paragraphId;
-          el.classList.add("audicle-clickable");
+        if (shouldUseElementForPlayback(el)) {
+          prepareClickableElement(el, paragraphId);
           paragraphId++;
         }
       });
+      preparedWithCustomRule = paragraphId > 0;
     }
-  } else {
+  }
+
+  if (!preparedWithCustomRule) {
     // フォールバック
     const selectors = "article p, main p, .post-body p, .entry-content p";
     const paragraphs = document.querySelectorAll(selectors);
-    paragraphs.forEach((p, index) => {
-      p.dataset.audicleId = index;
-      p.classList.add("audicle-clickable");
+    let paragraphId = 0;
+    paragraphs.forEach((p) => {
+      const text = (p.textContent || "").trim();
+      if (shouldUseElementForPlayback(p, text)) {
+        prepareClickableElement(p, paragraphId);
+        paragraphId++;
+      }
     });
   }
   if (!isClickAttached) {
@@ -346,6 +338,67 @@ function preparePage() {
   injectReadabilityLib();
 }
 
+function shouldUseElementForPlayback(element, providedText) {
+  const tagName = element?.tagName?.toLowerCase();
+  if (!tagName) {
+    return false;
+  }
+
+  const text =
+    providedText !== undefined
+      ? providedText
+      : (element.textContent || "").trim();
+  if (!text) {
+    return false;
+  }
+
+  if (tagName === "p" || tagName === "blockquote" || tagName === "pre") {
+    return true;
+  }
+
+  if (tagName === "li") {
+    return Boolean(element.closest("ul") || element.closest("ol"));
+  }
+
+  return (
+    tagName === "h1" ||
+    tagName === "h2" ||
+    tagName === "h3" ||
+    tagName === "h4" ||
+    tagName === "h5" ||
+    tagName === "h6"
+  );
+}
+
+function prepareClickableElement(element, paragraphId) {
+  if (!element) {
+    return;
+  }
+
+  element.dataset.audicleId = paragraphId;
+  element.classList.add("audicle-clickable");
+
+  const palette = computeAdaptiveColors(element);
+  element.style.setProperty("--audicle-hover-bg", palette.hoverBg);
+  element.style.setProperty("--audicle-hover-outline", palette.hoverOutline);
+}
+
+function clearAdaptiveStyles(element) {
+  if (!element) {
+    return;
+  }
+
+  [
+    "--audicle-hover-bg",
+    "--audicle-hover-outline",
+    "--audicle-highlight-bg",
+    "--audicle-highlight-color",
+    "--audicle-highlight-outline",
+  ].forEach((prop) => {
+    element.style.removeProperty(prop);
+  });
+}
+
 function cleanupPage() {
   audioPlayer.pause();
   isPlaying = false;
@@ -353,6 +406,7 @@ function cleanupPage() {
   paragraphs.forEach((p) => {
     p.classList.remove("audicle-clickable");
     delete p.dataset.audicleId;
+    clearAdaptiveStyles(p);
   });
   if (isClickAttached) {
     document.removeEventListener("click", handleClick, true);
@@ -372,6 +426,7 @@ function updateHighlight(paragraphId) {
   const currentHighlight = document.querySelector(".audicle-highlight");
   if (currentHighlight) {
     currentHighlight.classList.remove("audicle-highlight");
+    clearHighlightStyles(currentHighlight);
   }
   // 新しいハイライトを設定
   if (paragraphId !== null) {
@@ -379,6 +434,8 @@ function updateHighlight(paragraphId) {
       `[data-audicle-id="${paragraphId}"]`
     );
     if (element) {
+      const palette = computeAdaptiveColors(element);
+      applyHighlightStyles(element, palette);
       element.classList.add("audicle-highlight");
 
       // 自動スクロール: 要素が画面に見えるようにスクロール
@@ -404,6 +461,30 @@ function updateHighlight(paragraphId) {
       );
     }
   }
+}
+
+function applyHighlightStyles(element, palette) {
+  element.style.setProperty("--audicle-hover-bg", palette.hoverBg);
+  element.style.setProperty("--audicle-hover-outline", palette.hoverOutline);
+  element.style.setProperty("--audicle-highlight-bg", palette.highlightBg);
+  element.style.setProperty(
+    "--audicle-highlight-color",
+    palette.highlightColor
+  );
+  element.style.setProperty(
+    "--audicle-highlight-outline",
+    palette.highlightOutline
+  );
+}
+
+function clearHighlightStyles(element) {
+  [
+    "--audicle-highlight-bg",
+    "--audicle-highlight-color",
+    "--audicle-highlight-outline",
+  ].forEach((prop) => {
+    element.style.removeProperty(prop);
+  });
 }
 
 function handleClick(event) {
@@ -670,8 +751,7 @@ function buildQueueWithNewRulesManager() {
 
     // 要素にIDとクラスを設定（ハイライト用）
     if (element) {
-      element.dataset.audicleId = paragraphId;
-      element.classList.add("audicle-clickable");
+      prepareClickableElement(element, paragraphId);
     }
 
     // 200文字ごとに分割して音声キューに追加
@@ -975,8 +1055,7 @@ function convertBlocksToQueue(blocks) {
 
     // 要素にIDとクラスを設定（ハイライト用）
     if (block.element) {
-      block.element.dataset.audicleId = block.id;
-      block.element.classList.add("audicle-clickable");
+      prepareClickableElement(block.element, block.id);
     }
   });
 
@@ -1007,22 +1086,8 @@ function buildQueueWithCustomRule(rule) {
   allElements.forEach((el) => {
     const tagName = el.tagName.toLowerCase();
     const text = (el.textContent || "").trim();
-    if (
-      text &&
-      (tagName === "p" ||
-        (tagName === "li" && el.closest("ul")) ||
-        (tagName === "li" && el.closest("ol")) ||
-        tagName === "h1" ||
-        tagName === "h2" ||
-        tagName === "h3" ||
-        tagName === "h4" ||
-        tagName === "h5" ||
-        tagName === "h6" ||
-        tagName === "blockquote" ||
-        tagName === "pre")
-    ) {
-      el.dataset.audicleId = paragraphId;
-      el.classList.add("audicle-clickable");
+    if (shouldUseElementForPlayback(el, text)) {
+      prepareClickableElement(el, paragraphId);
       console.log(
         "buildQueueWithCustomRule: Added element",
         tagName,
@@ -1373,6 +1438,246 @@ function fullBatchFetch(callback) {
   }
 
   if (callback) callback();
+}
+
+function computeAdaptiveColors(element) {
+  const baseBackground = getEffectiveBackgroundColor(element);
+  const textColor = getEffectiveTextColor(element);
+
+  const baseLum = getRelativeLuminance(baseBackground);
+
+  // blend surrounding background with text color to create a subtle accent
+  let highlightBackground = blendColors(baseBackground, textColor, 0.32);
+  const highlightLum = getRelativeLuminance(highlightBackground);
+
+  if (Math.abs(highlightLum - baseLum) < 0.18) {
+    highlightBackground =
+      baseLum > 0.55
+        ? shadeColor(baseBackground, -0.35)
+        : shadeColor(baseBackground, 0.45);
+  }
+
+  const highlightText = ensureTextContrast(highlightBackground, textColor);
+  const highlightOutline =
+    baseLum > 0.55
+      ? shadeColor(highlightBackground, -0.35)
+      : shadeColor(highlightBackground, -0.1);
+
+  const hoverBackground =
+    baseLum > 0.55
+      ? shadeColor(baseBackground, -0.12)
+      : shadeColor(baseBackground, 0.25);
+  const hoverOutline =
+    baseLum > 0.55
+      ? shadeColor(highlightBackground, -0.2)
+      : shadeColor(highlightBackground, 0.2);
+
+  return {
+    highlightBg: toCssColorString(highlightBackground),
+    highlightColor: toCssColorString(highlightText),
+    highlightOutline: toCssColorString(highlightOutline),
+    hoverBg: toCssColorString(hoverBackground),
+    hoverOutline: toCssColorString(hoverOutline),
+  };
+}
+
+function getEffectiveTextColor(element) {
+  const style = element ? window.getComputedStyle(element) : null;
+  const parsed = parseColorString(style?.color);
+  return parsed || { r: 32, g: 32, b: 32, a: 1 };
+}
+
+function getEffectiveBackgroundColor(element) {
+  let current = element;
+  while (current && current !== document.documentElement) {
+    const style = window.getComputedStyle(current);
+    const parsed = parseColorString(style.backgroundColor);
+    if (parsed && parsed.a > 0.01) {
+      return { r: parsed.r, g: parsed.g, b: parsed.b, a: 1 };
+    }
+    current = current.parentElement;
+  }
+
+  const body = document.body || document.documentElement;
+  const bodyColor = parseColorString(
+    window.getComputedStyle(body).backgroundColor
+  );
+  if (bodyColor) {
+    return { r: bodyColor.r, g: bodyColor.g, b: bodyColor.b, a: 1 };
+  }
+
+  return { r: 255, g: 255, b: 255, a: 1 };
+}
+
+function ensureTextContrast(backgroundColor, preferredTextColor) {
+  const preferredContrast = getContrastRatio(
+    preferredTextColor,
+    backgroundColor
+  );
+  if (preferredContrast >= 4.5) {
+    return preferredTextColor;
+  }
+
+  const black = { r: 0, g: 0, b: 0, a: 1 };
+  const white = { r: 255, g: 255, b: 255, a: 1 };
+  const blackContrast = getContrastRatio(black, backgroundColor);
+  const whiteContrast = getContrastRatio(white, backgroundColor);
+
+  return blackContrast >= whiteContrast ? black : white;
+}
+
+function getContrastRatio(colorA, colorB) {
+  const luminanceA = getRelativeLuminance(colorA);
+  const luminanceB = getRelativeLuminance(colorB);
+  const lighter = Math.max(luminanceA, luminanceB);
+  const darker = Math.min(luminanceA, luminanceB);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function getRelativeLuminance(color) {
+  const srgb = [color.r, color.g, color.b].map((channel) => {
+    const normalized = channel / 255;
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : Math.pow((normalized + 0.055) / 1.055, 2.4);
+  });
+
+  return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+}
+
+function shadeColor(color, amount) {
+  const target =
+    amount > 0
+      ? { r: 255, g: 255, b: 255, a: color.a }
+      : { r: 0, g: 0, b: 0, a: color.a };
+  const weight = Math.min(Math.max(Math.abs(amount), 0), 1);
+  return blendColors(color, target, weight);
+}
+
+function blendColors(colorA, colorB, weight) {
+  const clampedWeight = Math.min(Math.max(weight, 0), 1);
+  return {
+    r: Math.round(colorA.r * (1 - clampedWeight) + colorB.r * clampedWeight),
+    g: Math.round(colorA.g * (1 - clampedWeight) + colorB.g * clampedWeight),
+    b: Math.round(colorA.b * (1 - clampedWeight) + colorB.b * clampedWeight),
+    a: colorA.a * (1 - clampedWeight) + colorB.a * clampedWeight,
+  };
+}
+
+function parseColorString(color) {
+  if (!color) {
+    return null;
+  }
+
+  const trimmed = color.trim().toLowerCase();
+  if (trimmed === "transparent" || trimmed === "inherit") {
+    return null;
+  }
+
+  const hexMatch = trimmed.match(/^#([0-9a-f]{3,8})$/i);
+  if (hexMatch) {
+    const value = hexMatch[1];
+    if (value.length === 3) {
+      return {
+        r: parseInt(value[0] + value[0], 16),
+        g: parseInt(value[1] + value[1], 16),
+        b: parseInt(value[2] + value[2], 16),
+        a: 1,
+      };
+    }
+    if (value.length === 4) {
+      return {
+        r: parseInt(value[0] + value[0], 16),
+        g: parseInt(value[1] + value[1], 16),
+        b: parseInt(value[2] + value[2], 16),
+        a: parseInt(value[3] + value[3], 16) / 255,
+      };
+    }
+    if (value.length === 6 || value.length === 8) {
+      return {
+        r: parseInt(value.slice(0, 2), 16),
+        g: parseInt(value.slice(2, 4), 16),
+        b: parseInt(value.slice(4, 6), 16),
+        a: value.length === 8 ? parseInt(value.slice(6, 8), 16) / 255 : 1,
+      };
+    }
+  }
+
+  const rgbMatch = trimmed.match(
+    /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(\d*\.?\d+))?\s*\)$/
+  );
+  if (rgbMatch) {
+    return {
+      r: Number(rgbMatch[1]),
+      g: Number(rgbMatch[2]),
+      b: Number(rgbMatch[3]),
+      a: rgbMatch[4] !== undefined ? Number(rgbMatch[4]) : 1,
+    };
+  }
+
+  const hslMatch = trimmed.match(
+    /^hsla?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%(?:\s*,\s*(\d*\.?\d+))?\s*\)$/
+  );
+  if (hslMatch) {
+    const h = Number(hslMatch[1]);
+    const s = Number(hslMatch[2]) / 100;
+    const l = Number(hslMatch[3]) / 100;
+    const rgb = hslToRgb(h, s, l);
+    return {
+      r: rgb.r,
+      g: rgb.g,
+      b: rgb.b,
+      a: hslMatch[4] !== undefined ? Number(hslMatch[4]) : 1,
+    };
+  }
+
+  return null;
+}
+
+function hslToRgb(h, s, l) {
+  const hue = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = l - c / 2;
+  let rPrime = 0;
+  let gPrime = 0;
+  let bPrime = 0;
+
+  if (hue < 60) {
+    rPrime = c;
+    gPrime = x;
+  } else if (hue < 120) {
+    rPrime = x;
+    gPrime = c;
+  } else if (hue < 180) {
+    gPrime = c;
+    bPrime = x;
+  } else if (hue < 240) {
+    gPrime = x;
+    bPrime = c;
+  } else if (hue < 300) {
+    rPrime = x;
+    bPrime = c;
+  } else {
+    rPrime = c;
+    bPrime = x;
+  }
+
+  return {
+    r: Math.round((rPrime + m) * 255),
+    g: Math.round((gPrime + m) * 255),
+    b: Math.round((bPrime + m) * 255),
+  };
+}
+
+function toCssColorString(color) {
+  const alpha = Number.isFinite(color.a) ? color.a : 1;
+  const roundedAlpha =
+    Math.round(Math.min(Math.max(alpha, 0), 1) * 1000) / 1000;
+  const r = Math.round(Math.min(Math.max(color.r, 0), 255));
+  const g = Math.round(Math.min(Math.max(color.g, 0), 255));
+  const b = Math.round(Math.min(Math.max(color.b, 0), 255));
+  return `rgba(${r}, ${g}, ${b}, ${roundedAlpha})`;
 }
 
 function injectStyles(filePath) {
