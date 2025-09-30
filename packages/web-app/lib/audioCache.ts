@@ -69,7 +69,7 @@ class AudioCache {
     voice: string = "ja-JP-Wavenet-B"
   ): Promise<void> {
     logger.info(`🔄 先読み開始: ${texts.length}件`);
-    
+
     const promises = texts.map(async (text) => {
       try {
         await this.get(text, voice);

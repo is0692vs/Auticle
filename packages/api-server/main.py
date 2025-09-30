@@ -82,7 +82,7 @@ async def _synthesize_to_bytes(text: str, voice: str) -> bytes:
 
     # 環境変数から再生速度を取得（デフォルト: 2.0倍速）
     speaking_rate = float(os.getenv("TTS_SPEAKING_RATE", "2.0"))
-    
+
     audio_config = texttospeech.AudioConfig(
         audio_encoding=texttospeech.AudioEncoding.MP3,
         speaking_rate=speaking_rate,
