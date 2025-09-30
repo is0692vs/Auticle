@@ -175,6 +175,14 @@ Docker 版 Edge TTS を使用する場合の追加テスト手順：
    }
    ```
 
+   Google Cloud TTS Docker を使用する場合:
+
+   ```json
+   {
+     "synthesizerType": "google_cloud_tts_docker"
+   }
+   ```
+
 3. **動作確認**
 
    ```bash

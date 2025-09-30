@@ -213,6 +213,47 @@ ssh -L 8001:localhost:8001 server-pc
 }
 ```
 
+---
+
+### 5. Google Cloud TTS Docker (GCP / WaveNet)
+
+**設定値**: `"google_cloud_tts_docker"`
+
+```json
+{
+  "synthesizerType": "google_cloud_tts_docker"
+}
+```
+
+**特徴**:
+
+- ✅ **WaveNet 品質**: Google Cloud Text-to-Speech の WaveNet 音声
+- ✅ **Docker 運用**: 依存関係をコンテナに閉じ込めて環境差を解消
+- ✅ **API 拡張**: `/voices` で利用可能な音声一覧を取得可能
+- ✅ **日本語音声**: `ja-JP-Wavenet-B` を既定とした自然な日本語読み上げ
+- ⚠️ **GCP 課金**: Google Cloud プロジェクトと課金設定が必要
+- ⚠️ **資格情報**: サービスアカウント鍵を安全に保管する必要がある
+
+**セットアップ手順**:
+
+1. GCP で Text-to-Speech API を有効化し、サービスアカウント鍵 (JSON) を取得
+2. `packages/google-tts-server/credentials/service-account.json` に鍵を配置
+3. `packages/google-tts-server` で `docker compose up --build -d`
+4. `config.json` を `{"synthesizerType": "google_cloud_tts_docker"}` に設定し、拡張を更新
+
+**技術詳細**:
+
+- サーバー: Docker 化 FastAPI (`google-tts-server`)
+- 既定エンドポイント: `<http://localhost:8002>`
+- 音声形式: MP3 (Google Cloud TTS)
+- 既定音声: `ja-JP-Wavenet-B`
+
+**運用メモ**:
+
+- 環境変数 `GOOGLE_TTS_DEFAULT_VOICE` や `GOOGLE_TTS_LANGUAGE_CODE` で既定値を調整
+- `docker compose logs -f` で API エラーを確認
+- サービスアカウント鍵は必ず `.gitignore` 対象にすること
+
 ## 🔧 設定方法
 
 ### 1. 設定ファイルの編集

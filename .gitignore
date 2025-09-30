@@ -2,3 +2,8 @@
 .vscode/
 
 /sample/
+
+
+gen-lang-client-*.json
+packages/google-tts-server/credentials/*.json
+packages/api-server/credentials/*.json
